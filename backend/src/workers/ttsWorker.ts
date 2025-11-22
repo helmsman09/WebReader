@@ -44,8 +44,7 @@ async function synthesizeTts(
   const response = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voiceId,
-    input: text,
-    format: "mp3"
+    input: text
   });
 
   // @ts-ignore

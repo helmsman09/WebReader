@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -17,6 +18,9 @@ type Mode = "text" | "pdf" | "audio";
 type Template = "image-top-text" | "image-flow" | "text-only" | "audio-only";
 
 const API_BASE = "http://localhost:4000";
+
+const MAX_FILE_MB = 50;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
 const AddContentScreen: React.FC = () => {
   const nav =
@@ -38,20 +42,63 @@ const AddContentScreen: React.FC = () => {
       .map((t) => t.trim())
       .filter(Boolean);
 
+  const handleTemplateChange = (tpl: Template) => {
+    setTemplate(tpl);
+    if (tpl === "audio-only") setMode("audio");
+    else if (tpl === "text-only") setMode("text");
+    // for image-top-text / image-flow we still let user choose pdf/audio/text,
+    // so we don't force mode here
+  };
+
+  const validatePickedFile = (
+    kind: "pdf" | "audio",
+    asset: DocumentPicker.DocumentPickerAsset
+  ): boolean => {
+    const mime = (asset.mimeType || "").toLowerCase();
+    const name = (asset.name || "").toLowerCase();
+
+    if (kind === "pdf") {
+      const looksPdf =
+        mime === "application/pdf" || name.endsWith(".pdf");
+      if (!looksPdf) {
+        Alert.alert("Invalid file", "Please pick a PDF document.");
+        return false;
+      }
+    } else {
+      const isAudioMime = mime.startsWith("audio/");
+      const audioExt = /\.(mp3|m4a|aac|wav|flac|ogg)$/i.test(name);
+      if (!isAudioMime && !audioExt) {
+        Alert.alert("Invalid file", "Please pick an audio file.");
+        return false;
+      }
+    }
+
+    const size = asset.size ?? 0;
+    if (size > MAX_FILE_BYTES) {
+      const mb = (size / (1024 * 1024)).toFixed(1);
+      Alert.alert(
+        "File too large",
+        `The selected file is ${mb} MB. Please choose a file under ${MAX_FILE_MB} MB.`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const chooseFile = async (kind: "pdf" | "audio") => {
     const result = await DocumentPicker.getDocumentAsync({
       type: kind === "pdf" ? "application/pdf" : "audio/*",
       copyToCacheDirectory: true
     });
-    if (result.type === "success") {
-      setFile(result.assets[0]);
-    }
-  };
 
-  const handleTemplateChange = (tpl: Template) => {
-    setTemplate(tpl);
-    if (tpl === "audio-only") setMode("audio");
-    else if (tpl === "text-only") setMode("text");
+    if (result.type === "success") {
+      const asset = result.assets[0];
+      if (!validatePickedFile(kind, asset)) {
+        return;
+      }
+      setFile(asset);
+    }
   };
 
   const handleSubmit = async () => {
@@ -64,6 +111,11 @@ const AddContentScreen: React.FC = () => {
       }
 
       if (mode === "text") {
+        if (!body.trim()) {
+          Alert.alert("Body required", "Please enter some text.");
+          return;
+        }
+
         const res = await fetch(`${API_BASE}/api/uploads/text`, {
           method: "POST",
           headers: {
@@ -86,14 +138,16 @@ const AddContentScreen: React.FC = () => {
           Alert.alert("File required", "Please pick a file first.");
           return;
         }
+
         const form = new FormData();
         const uri = file.uri;
         const name =
           file.name || (mode === "pdf" ? "file.pdf" : "audio-file");
         const mime =
-          file.mimeType || (mode === "pdf" ? "application/pdf" : "audio/mpeg");
+          file.mimeType ||
+          (mode === "pdf" ? "application/pdf" : "audio/mpeg");
 
-        // @ts-ignore
+        // @ts-ignore — React Native FormData file
         form.append("file", {
           uri,
           name,
@@ -129,6 +183,11 @@ const AddContentScreen: React.FC = () => {
     }
   };
 
+  const fileSizeLabel =
+    file?.size != null
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+      : undefined;
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>Add content</Text>
@@ -156,10 +215,10 @@ const AddContentScreen: React.FC = () => {
         ))}
       </View>
 
-      <Text style={styles.label}>Title</Text>
+      <Text style={styles.label}>Title (display name)</Text>
       <TextInput
         style={styles.input}
-        placeholder="Optional title"
+        placeholder="Optional title used for this page"
         value={title}
         onChangeText={setTitle}
       />
@@ -208,30 +267,65 @@ const AddContentScreen: React.FC = () => {
           <Text style={styles.label}>
             {mode === "pdf" ? "PDF file" : "Audio file"}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={styles.rowCenter}>
             <TouchableOpacity
-              onPress={() => chooseFile(mode === "pdf" ? "pdf" : "audio")}
+              onPress={() =>
+                chooseFile(mode === "pdf" ? "pdf" : "audio")
+              }
               style={styles.pickButton}
             >
               <Text style={{ color: "#fff" }}>
                 Choose {mode.toUpperCase()}
               </Text>
             </TouchableOpacity>
-            <Text style={{ marginLeft: 8, fontSize: 12 }} numberOfLines={1}>
-              {file ? file.name : "No file selected"}
-            </Text>
           </View>
+
+          {file && (
+            <View style={styles.fileCard}>
+              <View
+                style={[
+                  styles.fileIcon,
+                  mode === "pdf" ? styles.fileIconPdf : styles.fileIconAudio
+                ]}
+              >
+                <Text style={styles.fileIconText}>
+                  {mode === "pdf" ? "PDF" : "AUDIO"}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fileName} numberOfLines={1}>
+                  {file.name || "(unnamed file)"}
+                </Text>
+                <Text style={styles.fileMeta}>
+                  {mode === "pdf" ? "PDF document" : "Audio file"}
+                  {fileSizeLabel ? ` • ${fileSizeLabel}` : ""}
+                </Text>
+              </View>
+            </View>
+          )}
         </>
       )}
 
       <TouchableOpacity
         onPress={handleSubmit}
         disabled={loading}
-        style={[styles.saveButton, loading && { opacity: 0.7 }]}
+        style={[
+          styles.saveButton,
+          loading && { opacity: 0.8 }
+        ]}
       >
-        <Text style={{ color: "#fff", fontSize: 15 }}>
-          {loading ? "Saving..." : "Save"}
-        </Text>
+        {loading ? (
+          <View style={styles.saveInner}>
+            <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
+            <Text style={{ color: "#fff", fontSize: 15 }}>
+              Uploading…
+            </Text>
+          </View>
+        ) : (
+          <Text style={{ color: "#fff", fontSize: 15 }}>
+            Save
+          </Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -258,6 +352,11 @@ const styles = StyleSheet.create({
   },
   multiline: { height: 160, textAlignVertical: "top" },
   row: { flexDirection: "row", flexWrap: "wrap" },
+  rowCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4
+  },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -277,13 +376,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: "#4a6cff"
+    backgroundColor: "#4a6cff",
+    alignItems: "center"
   },
+  fileCard: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fafafa",
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  fileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10
+  },
+  fileIconPdf: { backgroundColor: "#e53935" },
+  fileIconAudio: { backgroundColor: "#3949ab" },
+  fileIconText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  fileName: { fontSize: 13, fontWeight: "600" },
+  fileMeta: { fontSize: 11, color: "#666", marginTop: 2 },
   saveButton: {
     marginTop: 24,
     paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: "#4a6cff",
     alignItems: "center"
+  },
+  saveInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center"
   }
 });

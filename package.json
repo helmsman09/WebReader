@@ -7,5 +7,15 @@
     "mobile",
     "types",
     "extension"
-  ]
+  ],
+  "scripts": {
+    "build:types": "npm run build -w @news-capture/types",
+    "build:backend": "npm run build -w @news-capture/backend",
+    "build:dashboard": "npm run build -w @news-capture/dashboard",
+    "build:extension": "npm run build -w @news-capture/extension",
+
+    "build": "npm run build:types && npm run build:backend && npm run build:dashboard && npm run build:extension",
+
+    "typecheck": "npm run typecheck --workspaces"
+  }
 }

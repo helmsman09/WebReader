@@ -59,7 +59,7 @@ async function captureActiveTabAndUpload(): Promise<{
   };
 
   const res = await fetch(
-    settings.backendUrl.replace(/\\/$/, "") + "/api/uploads/page",
+    settings.backendUrl.replace(/\/$/, "") + "/api/uploads/page",
     {
       method: "POST",
       headers: {

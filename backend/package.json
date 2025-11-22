@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "worker:tts": "ts-node-dev src/workers/ttsWorker.ts",
     "worker:summary": "ts-node-dev src/workers/summaryWorker.ts"
   },
@@ -16,10 +17,11 @@
     "express": "^4.18.2",
     "mongoose": "^8.0.0",
     "multer": "^1.4.5-lts.1",
-    "pdf-parse": "^1.1.1",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.7",
     "@types/node": "^20.0.0",
