@@ -174,7 +174,7 @@ const AddContentScreen: React.FC = () => {
       }
 
       Alert.alert("Saved", "Your content was added.");
-      nav.goBack();
+      nav.navigate("Library", { justUploaded: true });
     } catch (e: any) {
       console.log(e);
       Alert.alert("Upload error", e.message || "Failed to upload");
@@ -301,6 +301,12 @@ const AddContentScreen: React.FC = () => {
                   {fileSizeLabel ? ` • ${fileSizeLabel}` : ""}
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => setFile(null)}
+                style={styles.fileClearButton}
+              >
+                <Text style={styles.fileClearText}>×</Text>
+              </TouchableOpacity>
             </View>
           )}
         </>
@@ -413,5 +419,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center"
-  }
+  },
+  fileClearButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    backgroundColor: "#fff"
+  },
+  fileClearText: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "700",
+    marginTop: -1
+  },
 });

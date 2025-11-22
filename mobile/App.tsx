@@ -6,7 +6,7 @@ import AddContentScreen from "./src/screens/AddContentScreen";
 import PageDetailScreen from "./src/screens/PageDetailScreen";
 
 export type RootStackParamList = {
-  Library: undefined;
+  Library: { justUploaded?: boolean } | undefined;
   AddContent: undefined;
   PageDetail: { pageId: string };
 };

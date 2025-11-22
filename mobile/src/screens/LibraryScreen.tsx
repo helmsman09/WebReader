@@ -4,14 +4,20 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet
+  StyleSheet,
+  RefreshControl
 } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  RouteProp
+} from "@react-navigation/native";
 import type { RootStackParamList } from "../../App";
 import type { PageDTO } from "@news-capture/types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Library">;
+type Route = RouteProp<RootStackParamList, "Library">;
 
 const API_BASE = "http://localhost:4000";
 
@@ -23,28 +29,56 @@ function estimateMinutes(page: PageDTO): number {
   return Math.max(1, Math.round(words / 220));
 }
 
-function dateKeyFromISO(iso: string): string {
+function localDateKeyFromISO(iso: string): string {
   if (!iso) return "";
   try {
     const d = new Date(iso);
     if (!isFinite(d.getTime())) return "";
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+    return `${y}-${pad(m)}-${pad(day)}`;
   } catch {
     return "";
   }
 }
 
+function todayLocalKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+  return `${y}-${pad(m)}-${pad(day)}`;
+}
+
 function computeStats(pages: PageDTO[]) {
   if (!pages.length) {
-    return { streakDays: 0, totalMinutes: 0, daysRead: 0 };
+    return {
+      streakDays: 0,
+      totalMinutes: 0,
+      daysRead: 0,
+      todayMinutes: 0
+    };
   }
+
   const dateSet = new Set<string>();
+  const todayKey = todayLocalKey();
   let totalMinutes = 0;
+  let todayMinutes = 0;
 
   for (const p of pages) {
-    totalMinutes += estimateMinutes(p);
-    const key = dateKeyFromISO(p.createdAt);
-    if (key) dateSet.add(key);
+    const minutes = estimateMinutes(p);
+    totalMinutes += minutes;
+
+    const key = localDateKeyFromISO(p.createdAt);
+    if (key) {
+      dateSet.add(key);
+      if (key === todayKey) {
+        todayMinutes += minutes;
+      }
+    }
   }
 
   const dates = Array.from(dateSet).sort(); // ascending
@@ -52,21 +86,24 @@ function computeStats(pages: PageDTO[]) {
 
   let streak = 0;
   if (dates.length) {
-    const parseDate = (s: string) => new Date(s + "T00:00:00Z");
     const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+    const parseKey = (s: string) => {
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    };
 
-    let current = parseDate(dates[dates.length - 1]);
+    let current = parseKey(dates[dates.length - 1]);
     streak = 1;
 
     while (true) {
       const prev = new Date(current);
-      prev.setUTCDate(prev.getUTCDate() - 1);
+      prev.setDate(prev.getDate() - 1);
       const prevStr =
-        prev.getUTCFullYear() +
+        prev.getFullYear() +
         "-" +
-        pad(prev.getUTCMonth() + 1) +
+        pad(prev.getMonth() + 1) +
         "-" +
-        pad(prev.getUTCDate());
+        pad(prev.getDate());
       if (dateSet.has(prevStr)) {
         streak += 1;
         current = prev;
@@ -76,25 +113,52 @@ function computeStats(pages: PageDTO[]) {
     }
   }
 
-  return { streakDays: streak, totalMinutes, daysRead };
+  return { streakDays: streak, totalMinutes, daysRead, todayMinutes };
 }
 
 const LibraryScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
-  const [pages, setPages] = useState<PageDTO[]>([]);
+  const route = useRoute<Route>();
 
-  useEffect(() => {
-    const apiKey = ""; // TODO: fill from secure storage
+  const [pages, setPages] = useState<PageDTO[]>([]);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const apiKey = ""; // TODO: fill from secure storage
+
+  const loadPages = async () => {
     if (!apiKey) return;
-    (async () => {
+    try {
       const res = await fetch(`${API_BASE}/api/me/pages`, {
         headers: { Authorization: `Bearer ${apiKey}` }
       });
       if (!res.ok) return;
       const data = await res.json();
       setPages(data);
-    })();
+    } catch (e) {
+      console.log("Error loading pages", e);
+    }
+  };
+
+  useEffect(() => {
+    void loadPages();
   }, []);
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadPages();
+    setRefreshing(false);
+  };
+
+  // When navigated back after an upload: show success banner briefly
+  useEffect(() => {
+    if (route.params?.justUploaded) {
+      setShowSuccessBanner(true);
+      const t = setTimeout(() => setShowSuccessBanner(false), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [route.params?.justUploaded]);
 
   const stats = useMemo(() => computeStats(pages), [pages]);
 
@@ -113,23 +177,39 @@ const LibraryScreen: React.FC = () => {
           </View>
           <View style={styles.statsItem}>
             <Text style={styles.statsValue}>{stats.totalMinutes}</Text>
-            <Text style={styles.statsLabel}>est. minutes</Text>
+            <Text style={styles.statsLabel}>est. minutes (all time)</Text>
           </View>
         </View>
+        <Text style={styles.statsToday}>
+          Today: {stats.todayMinutes} min
+        </Text>
         <Text style={styles.statsFootnote}>
           *Streak ends on your most recent reading day.
         </Text>
       </View>
 
+      {showSuccessBanner && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            Content uploaded successfully
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={pages}
         keyExtractor={(item) => item._id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         renderItem={({ item }) => {
           const minutes = estimateMinutes(item);
           return (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => nav.navigate("PageDetail", { pageId: item._id })}
+              onPress={() =>
+                nav.navigate("PageDetail", { pageId: item._id })
+              }
             >
               <Text style={styles.title}>
                 {item.title || "(No title)"}
@@ -151,11 +231,14 @@ const LibraryScreen: React.FC = () => {
           );
         }}
       />
+
       <TouchableOpacity
         onPress={() => nav.navigate("AddContent")}
         style={styles.fab}
       >
-        <Text style={{ color: "#fff", fontSize: 28, marginTop: -3 }}>+</Text>
+        <Text style={{ color: "#fff", fontSize: 28, marginTop: -3 }}>
+          +
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -181,8 +264,28 @@ const styles = StyleSheet.create({
   },
   statsItem: { flex: 1, alignItems: "center" },
   statsValue: { fontSize: 18, fontWeight: "700" },
-  statsLabel: { fontSize: 11, color: "#555" },
+  statsLabel: { fontSize: 11, color: "#555", textAlign: "center" },
+  statsToday: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#2b5b34",
+    marginTop: 4
+  },
   statsFootnote: { fontSize: 10, color: "#777", marginTop: 2 },
+  banner: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#e0f7e9",
+    borderWidth: 1,
+    borderColor: "#9ad4b5",
+    marginBottom: 8
+  },
+  bannerText: {
+    fontSize: 12,
+    color: "#145c32",
+    textAlign: "center",
+    fontWeight: "500"
+  },
   card: {
     marginBottom: 8,
     padding: 10,
