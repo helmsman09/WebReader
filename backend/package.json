@@ -1,0 +1,30 @@
+{
+  "name": "@news-capture/backend",
+  "version": "0.0.1",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "worker:tts": "ts-node-dev src/workers/ttsWorker.ts",
+    "worker:summary": "ts-node-dev src/workers/summaryWorker.ts"
+  },
+  "dependencies": {
+    "@news-capture/types": "0.0.1",
+    "bullmq": "^5.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.18.2",
+    "mongoose": "^8.0.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.7",
+    "@types/node": "^20.0.0",
+    "@types/pdf-parse": "^1.1.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}

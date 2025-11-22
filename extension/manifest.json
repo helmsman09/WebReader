@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "News Capture Extension",
+  "description": "Capture cleaned news pages (text, images, audio tags, metadata) into your backend.",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "contentScript.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

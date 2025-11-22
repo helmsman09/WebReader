@@ -1,0 +1,11 @@
+{
+  "name": "news-reading-monorepo",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "dashboard",
+    "mobile",
+    "types",
+    "extension"
+  ]
+}
