@@ -1,33 +1,47 @@
 import React, { useEffect, useState } from "react";
 import type { ExtensionSettings } from "../types";
 
+type LastCapture = {
+  at: number;
+  pageUrl: string;
+  pageTitle: string;
+};
+
 type CaptureStatus =
   | { state: "idle" }
   | { state: "capturing" }
-  | { state: "success"; title: string }
-  | { state: "error"; message: string };
+  | { state: "error"; message: string }
+  | { state: "success"; title: string; pageId: string };
 
 const defaultSettings: ExtensionSettings = {
   backendUrl: "",
   apiKey: "",
-  defaultSharingMode: "private"
+  defaultSharingMode: "private",
+  dashboardUrl: ""
 };
 
 export const PopupApp: React.FC = () => {
   const [settings, setSettings] = useState<ExtensionSettings>(defaultSettings);
   const [status, setStatus] = useState<CaptureStatus>({ state: "idle" });
+  const [lastCapture, setLastCapture] = useState<LastCapture | null>(null);
 
   useEffect(() => {
     chrome.storage.sync.get(
-      ["backendUrl", "apiKey", "defaultSharingMode"],
+      ["backendUrl", "apiKey", "defaultSharingMode", "dashboardUrl"],
       (res) => {
         setSettings({
           backendUrl: res.backendUrl || "",
           apiKey: res.apiKey || "",
-          defaultSharingMode: res.defaultSharingMode || "private"
+          defaultSharingMode: res.defaultSharingMode || "private",
+          dashboardUrl: res.dashboardUrl || ""
         });
       }
     );
+    chrome.storage.local.get(["lastCapture"], (res) => {
+    if (res.lastCapture && typeof res.lastCapture.at === "number") {
+      setLastCapture(res.lastCapture as LastCapture);
+    }
+  });
   }, []);
 
   const updateSettings = (patch: Partial<ExtensionSettings>) => {
@@ -62,7 +76,14 @@ export const PopupApp: React.FC = () => {
       }
       setStatus({
         state: "success",
-        title: response.pageTitle || "Captured"
+        title: response.pageTitle || "Captured",
+        pageId: response.pageId   // <—
+      });
+      // Re-read last capture
+      chrome.storage.local.get(["lastCapture"], (res) => {
+        if (res.lastCapture && typeof res.lastCapture.at === "number") {
+          setLastCapture(res.lastCapture as LastCapture);
+        }
       });
     });
   };
@@ -126,6 +147,17 @@ export const PopupApp: React.FC = () => {
           <option value="shared">Shared</option>
         </select>
       </div>
+      <div style={{ marginBottom: 4 }}>
+        <label style={{ fontSize: 12 }}>Dashboard URL</label>
+        <input
+          type="text"
+          value={settings.dashboardUrl || ""}
+          onChange={(e) =>
+            updateSettings({dashboardUrl: e.target.value })
+          }
+          style={{ width: "100%" }}
+        />
+      </div>
 
       <button
         onClick={handleCapture}
@@ -152,6 +184,28 @@ export const PopupApp: React.FC = () => {
             Saved: <strong>{status.title}</strong>
           </div>
         )}
+        {status.state === "success" && status.pageId && (
+          <button
+            style={{
+              marginTop: 6,
+              padding: "6px 10px",
+              fontSize: 12,
+              borderRadius: 6,
+              background: "#4a6cff",
+              color: "white",
+              border: "none",
+              cursor: "pointer"
+            }}
+            onClick={() => {
+              // dashboardUrl must exist in extension settings (sync storage)
+              const dash = settings.dashboardUrl || "http://localhost:5174";
+              const url = `${dash}/#/page/${status.pageId}`;
+              chrome.tabs.create({ url });
+            }}
+          >
+            View in dashboard →
+          </button>
+        )}
         {status.state === "idle" && (
           <div style={{ color: "#777" }}>Ready.</div>
         )}
@@ -159,6 +213,47 @@ export const PopupApp: React.FC = () => {
           <div style={{ color: "#555" }}>Working…</div>
         )}
       </div>
+      {lastCapture && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: 6,
+            borderRadius: 6,
+            border: "1px solid #eee",
+            background: "#fafafa",
+            fontSize: 11
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>
+            Last capture
+          </div>
+          <div
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              marginBottom: 2
+            }}
+            title={lastCapture.pageTitle}
+          >
+            {lastCapture.pageTitle || "(untitled page)"}
+          </div>
+          <div
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              color: "#666"
+            }}
+            title={lastCapture.pageUrl}
+          >
+            {lastCapture.pageUrl}
+          </div>
+          <div style={{ color: "#999", marginTop: 2 }}>
+            {new Date(lastCapture.at).toLocaleString()}
+          </div>
+        </div>
+        )}
     </div>
   );
 };

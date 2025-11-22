@@ -88,7 +88,11 @@ async function captureActiveTabAndUpload(): Promise<{
     }
   });
 
-  return { ok: true, pageTitle: page.title || json?.page?.title };
+  return {
+    ok: true,
+    pageTitle: page.title || json?.page?.title,
+    pageId: json?.page?._id   // <-- Make sure backend returns this!
+   };
 }
 
 chrome.runtime.onMessage.addListener(

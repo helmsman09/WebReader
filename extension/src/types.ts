@@ -55,4 +55,5 @@ export interface ExtensionSettings {
   backendUrl: string;
   apiKey: string;
   defaultSharingMode: "private" | "unlisted" | "shared";
+  dashboardUrl: string;
 }
