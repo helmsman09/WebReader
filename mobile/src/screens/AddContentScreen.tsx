@@ -57,7 +57,7 @@ const AddContentScreen: React.FC = () => {
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      const apiKey = ""; // fill from secure storage
+      const apiKey = ""; // TODO: fill from secure storage
       if (!apiKey) {
         Alert.alert("Missing API key", "Configure your API key first.");
         return;

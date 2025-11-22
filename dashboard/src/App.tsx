@@ -1,439 +1,322 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Page } from "./types";
-import { PRESET_TAGS } from "@news-capture/types";
 import { TagEditor } from "./components/TagEditor";
 import { PageContentRenderer } from "./components/PageContentRenderer";
 import { UploadModal } from "./components/UploadModal";
+import type { TtsVoiceProfile } from "@news-capture/types";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
+const API_BASE = "http://localhost:4000";
 
-type Tab = "pages" | "log";
-
-type TagStat = {
-  tag: string;
-  count: number;
-};
-
-export function App() {
-  const [tab, setTab] = useState<Tab>("pages");
+export const App: React.FC = () => {
   const [pages, setPages] = useState<Page[]>([]);
-  const [tags, setTags] = useState<TagStat[]>([]);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedPage, setSelectedPage] = useState<Page | null>(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const apiKey = localStorage.getItem("API_KEY") || "";
-
-  const loadTags = async () => {
-    if (!apiKey) return;
-    const res = await fetch(`${API_BASE}/api/me/tags`, {
-      headers: { Authorization: `Bearer ${apiKey}` }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    setTags(data);
-  };
-
-  const loadPages = async (tag?: string | null) => {
-    if (!apiKey) return;
-    const params = new URLSearchParams();
-    if (tag) params.set("tag", tag);
-    const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${API_BASE}/api/me/pages${qs}`, {
-      headers: { Authorization: `Bearer ${apiKey}` }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    setPages(data);
-    if (data.length > 0) {
-      setSelectedPage(data[0]);
-    } else {
-      setSelectedPage(null);
-    }
-  };
+  const apiKey = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("API_KEY") || "";
+  }, []);
 
   useEffect(() => {
     if (!apiKey) return;
-    void loadTags();
-    void loadPages(selectedTag);
-  }, [apiKey, selectedTag]);
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (tagFilter) params.set("tag", tagFilter);
+        const res = await fetch(`${API_BASE}/api/me/pages?${params}`, {
+          headers: { Authorization: `Bearer ${apiKey}` }
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || "Failed to load pages");
+        }
+        const data = await res.json();
+        setPages(data);
+        if (!selectedId && data.length > 0) {
+          setSelectedId(data[0]._id);
+        }
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message || "Failed to load");
+      }
+    })();
+  }, [apiKey, tagFilter]);
 
-  if (!apiKey) {
-    return (
-      <div style={{ padding: 16 }}>
-        <h2>Set API key</h2>
-        <p>
-          Put your API key into <code>localStorage.API_KEY</code> and reload.
-        </p>
-      </div>
+  const selectedPage = useMemo(
+    () => pages.find((p) => p._id === selectedId) || null,
+    [pages, selectedId]
+  );
+
+  const handlePageUpdated = (updated: Page) => {
+    setPages((prev) =>
+      prev.map((p) => (p._id === updated._id ? updated : p))
     );
-  }
+  };
 
-  const userTagNames = tags.map((t) => t.tag);
+  const distinctTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of pages) for (const t of p.tags) set.add(t);
+    return Array.from(set).sort();
+  }, [pages]);
 
   return (
     <div
       style={{
         display: "flex",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+        height: "100vh",
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        fontSize: 13,
+        color: "#222"
       }}
     >
       <div
         style={{
-          width: 360,
-          borderRight: "1px solid #eee",
-          padding: 12,
-          boxSizing: "border-box"
+          width: 280,
+          borderRight: "1px solid #ddd",
+          padding: 8,
+          display: "flex",
+          flexDirection: "column"
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8
-          }}
-        >
-          <div>
-            <button
-              onClick={() => setTab("pages")}
-              style={{
-                marginRight: 4,
-                padding: "2px 8px",
-                borderRadius: 999,
-                border: "1px solid #ccc",
-                background: tab === "pages" ? "#e1e7ff" : "#f7f7f7"
-              }}
-            >
-              Pages
-            </button>
-            <button
-              onClick={() => setTab("log")}
-              style={{
-                padding: "2px 8px",
-                borderRadius: 999,
-                border: "1px solid #ccc",
-                background: tab === "log" ? "#e1e7ff" : "#f7f7f7"
-              }}
-            >
-              Reading log
-            </button>
+        <div style={{ display: "flex", marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>
+            Reading log
           </div>
           <button
-            onClick={() => setShowUploadModal(true)}
+            onClick={() => setShowUpload(true)}
             style={{
-              padding: "2px 10px",
-              borderRadius: 999,
-              border: "1px solid #4a6cff",
-              background: "#4a6cff",
-              color: "#fff",
-              fontSize: 12
+              padding: "2px 8px",
+              borderRadius: 6,
+              border: "1px solid #ccc",
+              background: "#f3f3f3",
+              fontSize: 12,
+              cursor: "pointer"
             }}
           >
             + New
           </button>
         </div>
 
-        {tab === "pages" && (
-          <>
-            <div style={{ marginBottom: 8, fontSize: 12 }}>
-              <span style={{ marginRight: 8 }}>Filter by tag:</span>
-              <button
-                onClick={() => setSelectedTag(null)}
-                style={{
-                  marginRight: 4,
-                  padding: "2px 6px",
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: selectedTag === null ? "#e1e7ff" : "#f7f7f7"
-                }}
-              >
-                All
-              </button>
-              {PRESET_TAGS.map((tag) => (
-                <button
-                  key={`preset-${tag}`}
-                  onClick={() =>
-                    setSelectedTag((prev) => (prev === tag ? null : tag))
-                  }
-                  style={{
-                    marginRight: 4,
-                    padding: "2px 6px",
-                    borderRadius: 12,
-                    border: "1px solid #ccc",
-                    background: selectedTag === tag ? "#e1e7ff" : "#f7f7f7"
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-              {userTagNames
-                .filter(
-                  (tag) =>
-                    !PRESET_TAGS.some(
-                      (preset) =>
-                        preset.toLowerCase() === tag.toLowerCase()
-                    )
-                )
-                .map((tag) => (
-                  <button
-                    key={`user-${tag}`}
-                    onClick={() =>
-                      setSelectedTag((prev) => (prev === tag ? null : tag))
-                    }
-                    style={{
-                      marginRight: 4,
-                      padding: "2px 6px",
-                      borderRadius: 12,
-                      border: "1px solid #ccc",
-                      background: selectedTag === tag ? "#e1e7ff" : "#f7f7f7"
-                    }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-            </div>
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, marginBottom: 2 }}>Filter by tag</div>
+          <select
+            value={tagFilter || ""}
+            onChange={(e) =>
+              setTagFilter(e.target.value || null)
+            }
+            style={{ width: "100%", fontSize: 12 }}
+          >
+            <option value="">All</option>
+            {distinctTags.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
 
+        <div style={{ fontSize: 11, color: "#777", marginBottom: 4 }}>
+          {pages.length} pages
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {pages.map((page) => (
             <div
+              key={page._id}
+              onClick={() => setSelectedId(page._id)}
               style={{
-                border: "1px solid #eee",
-                borderRadius: 8,
-                overflow: "hidden",
-                maxHeight: "calc(100vh - 80px)"
+                padding: 6,
+                marginBottom: 4,
+                borderRadius: 6,
+                border:
+                  page._id === selectedId
+                    ? "1px solid #4a6cff"
+                    : "1px solid #eee",
+                background:
+                  page._id === selectedId ? "#eef1ff" : "#fff",
+                cursor: "pointer"
               }}
             >
               <div
                 style={{
-                  padding: 8,
-                  borderBottom: "1px solid #eee",
                   fontSize: 12,
-                  fontWeight: 600
+                  fontWeight: 600,
+                  marginBottom: 2
                 }}
               >
-                Your pages
+                {page.title || "(No title)"}
               </div>
               <div
                 style={{
-                  maxHeight: "calc(100vh - 120px)",
+                  fontSize: 10,
+                  color: "#666",
+                  marginBottom: 2
+                }}
+              >
+                {page.meta?.siteName ||
+                  new URL(page.url).hostname.replace(/^www\\./, "")}
+              </div>
+              {page.meta?.metaDescription && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#555",
+                    marginBottom: 2
+                  }}
+                >
+                  {page.meta.metaDescription}
+                </div>
+              )}
+              <div style={{ display: "flex", flexWrap: "wrap" }}>
+                {page.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      fontSize: 10,
+                      padding: "1px 4px",
+                      borderRadius: 999,
+                      border: "1px solid #ddd",
+                      marginRight: 2,
+                      marginBottom: 2
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {error && (
+          <div style={{ fontSize: 11, color: "#b00", marginTop: 4 }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {selectedPage ? (
+          <>
+            <div
+              style={{
+                padding: 10,
+                borderBottom: "1px solid #ddd",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  {selectedPage.title || "(No title)"}
+                </div>
+                <div style={{ fontSize: 11, color: "#666" }}>
+                  {selectedPage.url}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+              <div
+                style={{
+                  flex: 2,
+                  padding: 12,
+                  overflowY: "auto",
+                  borderRight: "1px solid #f0f0f0"
+                }}
+              >
+                <PageContentRenderer page={selectedPage} />
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  padding: 10,
                   overflowY: "auto"
                 }}
               >
-                {pages.map((p) => {
-                  let hostname = "";
-                  try {
-                    hostname = new URL(p.url).hostname.replace(/^www\./, "");
-                  } catch {
-                    hostname = p.url;
+                <SummaryPanel
+                  apiBase={API_BASE}
+                  apiKey={apiKey}
+                  page={selectedPage}
+                  onUpdated={handlePageUpdated}
+                />
+                <TtsPanel
+                  apiBase={API_BASE}
+                  apiKey={apiKey}
+                  page={selectedPage}
+                  onUpdated={handlePageUpdated}
+                />
+                <TagEditor
+                  apiBase={API_BASE}
+                  apiKey={apiKey}
+                  pageId={selectedPage._id}
+                  initialTags={selectedPage.tags}
+                  onChange={(tags) =>
+                    handlePageUpdated({
+                      ...selectedPage,
+                      tags
+                    } as Page)
                   }
-                  const siteName = p.meta?.siteName || hostname;
-                  const description =
-                    p.meta?.metaDescription ||
-                    p.meta?.ogDescription ||
-                    p.meta?.twitterDescription ||
-                    "";
-
-                  return (
-                    <div
-                      key={p._id}
-                      onClick={() => setSelectedPage(p)}
-                      style={{
-                        padding: 8,
-                        borderBottom: "1px solid #f2f2f2",
-                        cursor: "pointer",
-                        background:
-                          selectedPage?._id === p._id ? "#f0f4ff" : "#fff",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 8
-                      }}
-                    >
-                      {p.meta?.ogImage && (
-                        <div
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 6,
-                            overflow: "hidden",
-                            flexShrink: 0,
-                            border: "1px solid #eee",
-                            background: "#fafafa"
-                          }}
-                        >
-                          <img
-                            src={p.meta.ogImage}
-                            alt=""
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover"
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            marginBottom: 2
-                          }}
-                        >
-                          {p.title || p.meta?.ogTitle || "(No title)"}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#666",
-                            marginBottom: 2
-                          }}
-                        >
-                          {siteName}
-                        </div>
-                        {description && (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "#555",
-                              marginBottom: 4
-                            }}
-                          >
-                            {description.length > 120
-                              ? description.slice(0, 120) + "…"
-                              : description}
-                          </div>
-                        )}
-                        {p.tags && p.tags.length > 0 && (
-                          <div style={{ fontSize: 10 }}>
-                            {p.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                style={{
-                                  display: "inline-block",
-                                  marginRight: 4,
-                                  padding: "1px 5px",
-                                  borderRadius: 999,
-                                  border: "1px solid #eee"
-                                }}
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {pages.length === 0 && (
-                  <div style={{ padding: 12, fontSize: 12, color: "#777" }}>
-                    No pages yet. Capture via extension or click "New".
-                  </div>
-                )}
+                />
               </div>
             </div>
           </>
-        )}
-
-        {tab === "log" && (
-          <div style={{ padding: 8, fontSize: 12 }}>
-            Reading log view (streaks, daily time) can go here.
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              color: "#777"
+            }}
+          >
+            No page selected.
           </div>
         )}
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          padding: 16,
-          boxSizing: "border-box",
-          maxWidth: 900,
-          margin: "0 auto"
-        }}
-      >
-        {!selectedPage && (
-          <div style={{ fontSize: 14, color: "#777" }}>
-            Select a page on the left.
-          </div>
-        )}
-        {selectedPage && (
-          <>
-            <div style={{ marginBottom: 8 }}>
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  marginBottom: 4
-                }}
-              >
-                {selectedPage.title ||
-                  selectedPage.meta?.ogTitle ||
-                  "(No title)"}
-              </div>
-              <div style={{ fontSize: 12, color: "#666" }}>
-                {selectedPage.url}
-              </div>
-            </div>
-
-            {/* Summary view */}
-            <SummaryPanel
-              page={selectedPage}
-              apiBase={API_BASE}
-              apiKey={apiKey}
-              onUpdated={(page) => setSelectedPage(page)}
-            />
-
-            <TagEditor
-              apiBase={API_BASE}
-              apiKey={apiKey}
-              pageId={selectedPage._id}
-              initialTags={selectedPage.tags}
-              onChange={(tags) =>
-                setSelectedPage({ ...selectedPage, tags })
-              }
-            />
-
-            <div style={{ marginTop: 16 }}>
-              <PageContentRenderer page={selectedPage} />
-            </div>
-          </>
-        )}
-      </div>
-
-      {showUploadModal && (
+      {showUpload && (
         <UploadModal
           apiBase={API_BASE}
           apiKey={apiKey}
-          onClose={() => {
-            setShowUploadModal(false);
-            void loadTags();
-            void loadPages(selectedTag);
-          }}
+          onClose={() => setShowUpload(false)}
         />
       )}
     </div>
   );
-}
+};
 
-type SummaryPanelProps = {
-  page: Page;
+type PanelProps = {
   apiBase: string;
   apiKey: string;
+  page: Page;
   onUpdated: (page: Page) => void;
 };
 
-const SummaryPanel: React.FC<SummaryPanelProps> = ({
-  page,
+const SummaryPanel: React.FC<PanelProps> = ({
   apiBase,
   apiKey,
+  page,
   onUpdated
 }) => {
   const [loading, setLoading] = useState(false);
+  const [localSummary, setLocalSummary] = useState(page.summary || "");
   const [error, setError] = useState<string | null>(null);
 
-  const triggerResummarize = async () => {
+  useEffect(() => {
+    setLocalSummary(page.summary || "");
+    setError(null);
+  }, [page._id, page.summary]);
+
+  const handleResummarize = async () => {
     try {
       setLoading(true);
       setError(null);
+      setLocalSummary("");
       const res = await fetch(`${apiBase}/api/pages/${page._id}/summary`, {
         method: "POST",
         headers: {
@@ -445,13 +328,13 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
         const txt = await res.text();
         throw new Error(txt || "Failed to queue summary");
       }
-      // optimistic UI: clear old summary while new one is generated
-      onUpdated({
+      const updated: Page = {
         ...page,
         summary: "",
         summaryProvider: "",
         summaryCreatedAt: ""
-      });
+      } as any;
+      onUpdated(updated);
     } catch (e: any) {
       console.error(e);
       setError(e.message || "Failed to queue summary");
@@ -460,13 +343,15 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
     }
   };
 
+  const summaryText = localSummary || page.summary || "";
+
   return (
     <div
       style={{
+        marginBottom: 10,
+        padding: 8,
         borderRadius: 8,
-        border: "1px solid #eee",
-        padding: 10,
-        marginBottom: 12,
+        border: "1px solid #ddd",
         background: "#fafbff"
       }}
     >
@@ -474,60 +359,177 @@ const SummaryPanel: React.FC<SummaryPanelProps> = ({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          marginBottom: 4,
-          alignItems: "center"
+          marginBottom: 4
         }}
       >
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Summary</div>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>Summary</div>
         <button
-          onClick={triggerResummarize}
+          onClick={handleResummarize}
           disabled={loading}
           style={{
-            padding: "2px 8px",
             borderRadius: 999,
             border: "1px solid #4a6cff",
-            background: "#f0f3ff",
-            color: "#1f32a0",
+            background: "#4a6cff",
+            color: "#fff",
             fontSize: 11,
+            padding: "2px 6px",
             cursor: "pointer"
           }}
         >
-          {loading ? "Re-summarizing…" : "Re-summarize"}
+          {loading ? "Queuing…" : "Re-summarize"}
         </button>
       </div>
+      {summaryText ? (
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            fontSize: 12,
+            lineHeight: 1.5,
+            margin: 0
+          }}
+        >
+          {summaryText}
+        </pre>
+      ) : (
+        <div style={{ fontSize: 12, color: "#777" }}>
+          No summary yet. After a few seconds, refresh to see it.
+        </div>
+      )}
+      {page.summaryProvider && page.summaryCreatedAt && (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 10,
+            color: "#888"
+          }}
+        >
+          Provider: {page.summaryProvider} · Updated:{" "}
+          {new Date(page.summaryCreatedAt).toLocaleString()}
+        </div>
+      )}
       {error && (
-        <div style={{ fontSize: 11, color: "#b00020", marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: "#b00", marginTop: 4 }}>
           {error}
         </div>
       )}
-      {page.summary ? (
-        <div
-          style={{
-            fontSize: 12,
-            whiteSpace: "pre-wrap",
-            lineHeight: 1.5
-          }}
-        >
-          {page.summary}
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 10,
-              color: "#777"
-            }}
-          >
-            {page.summaryProvider && (
-              <>Generated by {page.summaryProvider}. </>
-            )}
-            {page.summaryCreatedAt && (
-              <>Last updated: {new Date(page.summaryCreatedAt).toLocaleString()}</>
-            )}
-          </div>
+    </div>
+  );
+};
+
+const TtsPanel: React.FC<PanelProps> = ({
+  apiBase,
+  apiKey,
+  page,
+  onUpdated
+}) => {
+  const [voice, setVoice] = useState<TtsVoiceProfile>(
+    (page.tts?.voiceProfile as TtsVoiceProfile) || "man"
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (page.tts?.voiceProfile) {
+      setVoice(page.tts.voiceProfile as TtsVoiceProfile);
+    }
+    setError(null);
+  }, [page._id, page.tts?.voiceProfile]);
+
+  const handleGenerate = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${apiBase}/api/pages/${page._id}/tts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({ voiceProfile: voice })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || "Failed to queue TTS");
+      }
+      const updated: Page = {
+        ...page,
+        tts: page.tts || null
+      } as any;
+      onUpdated(updated);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Failed to queue TTS");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginBottom: 10,
+        padding: 8,
+        borderRadius: 8,
+        border: "1px solid #ddd",
+        background: "#f8f9ff"
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 4
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 600 }}>
+          Text-to-speech
         </div>
-      ) : (
-        <div style={{ fontSize: 12, color: "#777" }}>
-          No summary yet. It will be generated for new captures, or click
-          &ldquo;Re-summarize&rdquo;.
+      </div>
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 11, marginBottom: 2 }}>Voice</div>
+        <select
+          value={voice}
+          onChange={(e) => setVoice(e.target.value as TtsVoiceProfile)}
+          style={{ width: "100%", fontSize: 12 }}
+        >
+          <option value="boy">Boy</option>
+          <option value="girl">Girl</option>
+          <option value="man">Man</option>
+          <option value="woman">Woman</option>
+        </select>
+      </div>
+      <button
+        onClick={handleGenerate}
+        disabled={loading}
+        style={{
+          borderRadius: 6,
+          border: "1px solid #4a6cff",
+          background: "#4a6cff",
+          color: "#fff",
+          fontSize: 11,
+          padding: "4px 8px",
+          cursor: "pointer",
+          width: "100%"
+        }}
+      >
+        {loading ? "Queuing TTS…" : "Generate TTS audio"}
+      </button>
+      {page.tts && (
+        <div style={{ marginTop: 6, fontSize: 11 }}>
+          <div>
+            Latest: {page.tts.voiceProfile} ·{" "}
+            {new Date(page.tts.createdAt).toLocaleString()}
+          </div>
+          <audio
+            controls
+            src={page.tts.audioUrl}
+            style={{ width: "100%", marginTop: 4 }}
+          />
+        </div>
+      )}
+      {error && (
+        <div style={{ fontSize: 11, color: "#b00", marginTop: 4 }}>
+          {error}
         </div>
       )}
     </div>

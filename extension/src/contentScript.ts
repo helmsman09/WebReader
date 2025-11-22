@@ -52,7 +52,7 @@ function getMainContainer(): HTMLElement {
       best = el;
     }
   }
-  return best || document.body;
+  return best || (document.body as HTMLElement);
 }
 
 function walkAndCollectBlocks(root: HTMLElement): Block[] {

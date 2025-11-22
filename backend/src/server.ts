@@ -71,7 +71,7 @@ async function parsePdfText(filePath: string): Promise<string> {
   return parsed.text || "";
 }
 
-// stub for your real storage
+// stub storage for uploaded files
 async function storeUploadedFile(
   filePath: string,
   originalName: string,
@@ -288,7 +288,7 @@ app.post(
   }
 );
 
-// Upload a PDF and create a text-only page (real pdf-parse)
+// Upload a PDF and create a text-only page
 app.post(
   "/api/uploads/pdf",
   authWithApiKey,

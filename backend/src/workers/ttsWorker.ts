@@ -16,6 +16,7 @@ const openai = new OpenAI({
 function mapVoiceProfileToProviderVoice(
   profile: TtsVoiceProfile
 ): { provider: string; voiceId: string } {
+  // Simple mapping, adjust to your needs
   switch (profile) {
     case "boy":
       return { provider: "openai", voiceId: "alloy" };
@@ -30,16 +31,15 @@ function mapVoiceProfileToProviderVoice(
   }
 }
 
-// Use OpenAI TTS to synthesize speech
 async function synthesizeTts(
   text: string,
   profile: TtsVoiceProfile
 ): Promise<{ audioBuffer: Buffer; provider: string }> {
-  const { provider, voiceId } = mapVoiceProfileToProviderVoice(profile);
-
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is not set");
   }
+
+  const { provider, voiceId } = mapVoiceProfileToProviderVoice(profile);
 
   const response = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts",
@@ -48,8 +48,6 @@ async function synthesizeTts(
     format: "mp3"
   });
 
-  // Node client returns a web Response-like object
-  // Convert to Buffer
   // @ts-ignore
   const arrayBuffer = await response.arrayBuffer();
   const audioBuffer = Buffer.from(arrayBuffer);
@@ -57,13 +55,11 @@ async function synthesizeTts(
   return { audioBuffer, provider };
 }
 
-// Stub for your real storage (S3/GCS/etc)
+// Replace this stub with real storage (S3, GCS, etc.)
 async function uploadAudioAndGetUrl(
   pageId: string,
   audioBuffer: Buffer
 ): Promise<string> {
-  // TODO: replace with real upload code
-  // Example (S3): putObject, then return the public URL.
   console.log(
     `[TTS] Generated audio for page ${pageId} (size=${audioBuffer.length} bytes)`
   );
