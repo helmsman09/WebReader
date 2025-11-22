@@ -6,6 +6,397 @@ import { UploadModal } from "./components/UploadModal";
 import type { TtsVoiceProfile } from "@news-capture/types";
 
 const API_BASE = "http://localhost:4000";
+type WeeklyDayStat = {
+  key: string;
+  label: string;
+  minutes: number;
+};
+
+type StreakStats = {
+  currentStreak: number;
+  bestStreak: number;
+};
+
+type CalendarCell = {
+  key: string;
+  dayOfMonth: number;
+  minutes: number;
+  level: 0 | 1 | 2 | 3;
+};
+
+function computeStreakStats(pages: Page[]): StreakStats {
+  if (!pages.length) return { currentStreak: 0, bestStreak: 0 };
+
+  const dateSet = new Set<string>();
+  for (const p of pages) {
+    const key = localDateKeyFromISO((p as any).createdAt || "");
+    if (key) dateSet.add(key);
+  }
+
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+  const parseKey = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const isNextDay = (a: Date, b: Date) => {
+    const next = new Date(a);
+    next.setDate(next.getDate() + 1);
+    return (
+      next.getFullYear() === b.getFullYear() &&
+      next.getMonth() === b.getMonth() &&
+      next.getDate() === b.getDate()
+    );
+  };
+
+  const dates = Array.from(dateSet).sort(); // asc
+
+  // best streak
+  let best = 0;
+  let i = 0;
+  while (i < dates.length) {
+    let run = 1;
+    let current = parseKey(dates[i]);
+    let j = i + 1;
+    while (j < dates.length && isNextDay(current, parseKey(dates[j]))) {
+      run++;
+      current = parseKey(dates[j]);
+      j++;
+    }
+    if (run > best) best = run;
+    i = j;
+  }
+
+  // current streak: from latest backwards
+  let currentStreak = 0;
+  if (dates.length) {
+    let cur = parseKey(dates[dates.length - 1]);
+    currentStreak = 1;
+    while (true) {
+      const prev = new Date(cur);
+      prev.setDate(prev.getDate() - 1);
+      const prevStr =
+        prev.getFullYear() +
+        "-" +
+        pad(prev.getMonth() + 1) +
+        "-" +
+        pad(prev.getDate());
+      if (dateSet.has(prevStr)) {
+        currentStreak++;
+        cur = prev;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return { currentStreak, bestStreak: best };
+}
+
+function buildCalendarHeatmap(pages: Page[]): CalendarCell[] {
+  const minutesByKey = new Map<string, number>();
+  for (const p of pages) {
+    const key = localDateKeyFromISO((p as any).createdAt || "");
+    if (!key) continue;
+    const prev = minutesByKey.get(key) || 0;
+    minutesByKey.set(key, prev + estimateMinutes(p));
+  }
+
+  const cells: CalendarCell[] = [];
+  const today = new Date();
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+
+  // last 30 days (oldest → newest)
+  for (let offset = 29; offset >= 0; offset--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - offset);
+    const key =
+      d.getFullYear() +
+      "-" +
+      pad(d.getMonth() + 1) +
+      "-" +
+      pad(d.getDate());
+    const minutes = minutesByKey.get(key) || 0;
+
+    let level: 0 | 1 | 2 | 3 = 0;
+    if (minutes > 0 && minutes <= 10) level = 1;
+    else if (minutes <= 30) level = 2;
+    else if (minutes > 30) level = 3;
+
+    cells.push({
+      key,
+      dayOfMonth: d.getDate(),
+      minutes,
+      level
+    });
+  }
+
+  return cells;
+}
+
+function estimateMinutes(page: Page): number {
+  const text = (page.mainText || "").trim();
+  if (!text) return 1;
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (!words) return 1;
+  return Math.max(1, Math.round(words / 220));
+}
+
+function localDateKeyFromISO(iso: string): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (!isFinite(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+    return `${y}-${pad(m)}-${pad(day)}`;
+  } catch {
+    return "";
+  }
+}
+
+function buildWeeklySeries(pages: Page[]): WeeklyDayStat[] {
+  const today = new Date();
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+
+  const dayLabel = (d: Date) => {
+    const names = ["S", "M", "T", "W", "T", "F", "S"];
+    return names[d.getDay()];
+  };
+
+  const minutesByKey = new Map<string, number>();
+  for (const p of pages) {
+    const key = localDateKeyFromISO((p as any).createdAt || "");
+    if (!key) continue;
+    const prev = minutesByKey.get(key) || 0;
+    minutesByKey.set(key, prev + estimateMinutes(p));
+  }
+
+  const series: WeeklyDayStat[] = [];
+  const start = new Date(today);
+  start.setDate(start.getDate() - 6); // 6 days ago
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key =
+      d.getFullYear() +
+      "-" +
+      pad(d.getMonth() + 1) +
+      "-" +
+      pad(d.getDate());
+    const minutes = minutesByKey.get(key) || 0;
+    series.push({
+      key,
+      label: dayLabel(d),
+      minutes
+    });
+  }
+
+  return series;
+}
+const CalendarHeatmapPanel: React.FC<{ cells: CalendarCell[] }> = ({
+  cells
+}) => {
+  if (!cells.length) return null;
+
+  const cols = 7;
+  const rows: CalendarCell[][] = [];
+  for (let i = 0; i < cells.length; i += cols) {
+    rows.push(cells.slice(i, i + cols));
+  }
+
+  const colorForLevel = (level: 0 | 1 | 2 | 3) => {
+    switch (level) {
+      case 0:
+        return "#f4f5fb";
+      case 1:
+        return "#d8ddff";
+      case 2:
+        return "#aab5ff";
+      case 3:
+        return "#4a6cff";
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginBottom: 10,
+        padding: 8,
+        borderRadius: 8,
+        border: "1px solid #ddd",
+        background: "#fafbff"
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          marginBottom: 4
+        }}
+      >
+        Last 30 days
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 3
+        }}
+      >
+        {rows.map((row, idx) => (
+          <div
+            key={idx}
+            style={{ display: "flex", gap: 3, justifyContent: "flex-start" }}
+          >
+            {row.map((cell) => (
+              <div
+                key={cell.key}
+                title={`${cell.dayOfMonth}: ${cell.minutes} min`}
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  background: colorForLevel(cell.level),
+                  border: "1px solid #e0e2f5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 8,
+                    color: cell.level >= 2 ? "#fff" : "#555"
+                  }}
+                >
+                  {cell.dayOfMonth}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          marginTop: 4,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 9,
+          color: "#555"
+        }}
+      >
+        <span>Intensity:</span>
+        {[0, 1, 2, 3].map((lvl) => (
+          <div
+            key={lvl}
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 3,
+              background: colorForLevel(lvl as 0 | 1 | 2 | 3),
+              border: "1px solid #e0e2f5"
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const WeeklyChartPanel: React.FC<{ series: WeeklyDayStat[] }> = ({
+  series
+}) => {
+  if (!series.length) return null;
+  const max = Math.max(...series.map((d) => d.minutes), 1);
+
+  return (
+    <div
+      style={{
+        marginBottom: 10,
+        padding: 8,
+        borderRadius: 8,
+        border: "1px solid #ddd",
+        background: "#f7f8ff"
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          marginBottom: 4
+        }}
+      >
+        Weekly minutes
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 4,
+          height: 60
+        }}
+      >
+        {series.map((day) => {
+          const ratio = day.minutes / max;
+          const barHeight = Math.max(4, ratio * 100); // percentage of container
+          return (
+            <div
+              key={day.key}
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center"
+              }}
+              title={`${day.minutes} min`}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "flex-end",
+                  width: "100%"
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    background: "#dde2ff",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                    height: "100%"
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      height: `${barHeight}%`,
+                      background: "#4a6cff",
+                      borderRadius: 4
+                    }}
+                  />
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#555",
+                  marginTop: 2
+                }}
+              >
+                {day.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export const App: React.FC = () => {
   const [pages, setPages] = useState<Page[]>([]);
@@ -47,6 +438,17 @@ export const App: React.FC = () => {
   const selectedPage = useMemo(
     () => pages.find((p) => p._id === selectedId) || null,
     [pages, selectedId]
+  );
+
+  const weeklySeries = useMemo(() => buildWeeklySeries(pages), [pages]);
+
+  const streakStats = useMemo(
+    () => computeStreakStats(pages),
+    [pages]
+  );
+  const calendarCells = useMemo(
+    () => buildCalendarHeatmap(pages),
+    [pages]
   );
 
   const handlePageUpdated = (updated: Page) => {
@@ -236,6 +638,36 @@ export const App: React.FC = () => {
                   overflowY: "auto"
                 }}
               >
+                {/* Streak stats + badge */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>Streak</div>
+                    <div style={{ fontSize: 12 }}>
+                      Current: {streakStats.currentStreak} day
+                      {streakStats.currentStreak === 1 ? "" : "s"} · Best:{" "}
+                      {streakStats.bestStreak} day
+                      {streakStats.bestStreak === 1 ? "" : "s"}
+                    </div>
+                  {streakStats.currentStreak >= 3 &&
+                    streakStats.currentStreak === streakStats.bestStreak && (
+                    <div
+                      style={{
+                      fontSize: 11,
+                      color: "#d35400",
+                      marginTop: 2,
+                      fontWeight: 600
+                    }}
+                    >
+                      🔥 New best streak!
+                    </div>
+                  )}
+                </div>
+                {/* Weekly bar chart */}
+                <WeeklyChartPanel series={weeklySeries} />
+
+                {/* 30-day calendar heatmap */}
+                <CalendarHeatmapPanel cells={calendarCells} />
+
+                {/* Existing panels */}
                 <SummaryPanel
                   apiBase={API_BASE}
                   apiKey={apiKey}

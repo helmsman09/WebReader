@@ -21,6 +21,12 @@ type Route = RouteProp<RootStackParamList, "Library">;
 
 const API_BASE = "http://localhost:4000";
 
+type WeeklyDay = {
+  key: string;
+  label: string;
+  minutes: number;
+};
+
 function estimateMinutes(page: PageDTO): number {
   const text = (page.mainText || "").trim();
   if (!text) return 1;
@@ -57,6 +63,7 @@ function computeStats(pages: PageDTO[]) {
   if (!pages.length) {
     return {
       streakDays: 0,
+      bestStreak: 0,
       totalMinutes: 0,
       daysRead: 0,
       todayMinutes: 0
@@ -81,22 +88,47 @@ function computeStats(pages: PageDTO[]) {
     }
   }
 
-  const dates = Array.from(dateSet).sort(); // ascending
+  const dates = Array.from(dateSet).sort();
   const daysRead = dates.length;
 
-  let streak = 0;
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+  const parseKey = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const isNextDay = (a: Date, b: Date) => {
+    const next = new Date(a);
+    next.setDate(next.getDate() + 1);
+    return (
+      next.getFullYear() === b.getFullYear() &&
+      next.getMonth() === b.getMonth() &&
+      next.getDate() === b.getDate()
+    );
+  };
+
+  // best streak
+  let bestStreak = 0;
+  let i = 0;
+  while (i < dates.length) {
+    let run = 1;
+    let current = parseKey(dates[i]);
+    let j = i + 1;
+    while (j < dates.length && isNextDay(current, parseKey(dates[j]))) {
+      run++;
+      current = parseKey(dates[j]);
+      j++;
+    }
+    if (run > bestStreak) bestStreak = run;
+    i = j;
+  }
+
+  // current streak (streakDays)
+  let streakDays = 0;
   if (dates.length) {
-    const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
-    const parseKey = (s: string) => {
-      const [y, m, d] = s.split("-").map(Number);
-      return new Date(y, m - 1, d);
-    };
-
-    let current = parseKey(dates[dates.length - 1]);
-    streak = 1;
-
+    let cur = parseKey(dates[dates.length - 1]);
+    streakDays = 1;
     while (true) {
-      const prev = new Date(current);
+      const prev = new Date(cur);
       prev.setDate(prev.getDate() - 1);
       const prevStr =
         prev.getFullYear() +
@@ -105,15 +137,63 @@ function computeStats(pages: PageDTO[]) {
         "-" +
         pad(prev.getDate());
       if (dateSet.has(prevStr)) {
-        streak += 1;
-        current = prev;
+        streakDays++;
+        cur = prev;
       } else {
         break;
       }
     }
   }
 
-  return { streakDays: streak, totalMinutes, daysRead, todayMinutes };
+  return {
+    streakDays,
+    bestStreak,
+    totalMinutes,
+    daysRead,
+    todayMinutes
+  };
+}
+
+
+function buildWeeklySeries(pages: PageDTO[]): WeeklyDay[] {
+  const today = new Date();
+  const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
+
+  const dayLabel = (d: Date) => {
+    const names = ["S", "M", "T", "W", "T", "F", "S"];
+    return names[d.getDay()];
+  };
+
+  const minutesByKey = new Map<string, number>();
+  for (const p of pages) {
+    const key = localDateKeyFromISO(p.createdAt);
+    if (!key) continue;
+    const prev = minutesByKey.get(key) || 0;
+    minutesByKey.set(key, prev + estimateMinutes(p));
+  }
+
+  const series: WeeklyDay[] = [];
+  const start = new Date(today);
+  start.setDate(start.getDate() - 6); // 6 days ago
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key =
+      d.getFullYear() +
+      "-" +
+      pad(d.getMonth() + 1) +
+      "-" +
+      pad(d.getDate());
+    const minutes = minutesByKey.get(key) || 0;
+    series.push({
+      key,
+      label: dayLabel(d),
+      minutes
+    });
+  }
+
+  return series;
 }
 
 const LibraryScreen: React.FC = () => {
@@ -144,14 +224,12 @@ const LibraryScreen: React.FC = () => {
     void loadPages();
   }, []);
 
-  // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadPages();
     setRefreshing(false);
   };
 
-  // When navigated back after an upload: show success banner briefly
   useEffect(() => {
     if (route.params?.justUploaded) {
       setShowSuccessBanner(true);
@@ -161,6 +239,14 @@ const LibraryScreen: React.FC = () => {
   }, [route.params?.justUploaded]);
 
   const stats = useMemo(() => computeStats(pages), [pages]);
+  const weeklySeries = useMemo(() => buildWeeklySeries(pages), [pages]);
+  const maxWeekly = useMemo(
+    () =>
+      weeklySeries.length
+        ? Math.max(...weeklySeries.map((d) => d.minutes), 1)
+        : 1,
+    [weeklySeries]
+  );
 
   return (
     <View style={styles.container}>
@@ -183,6 +269,38 @@ const LibraryScreen: React.FC = () => {
         <Text style={styles.statsToday}>
           Today: {stats.todayMinutes} min
         </Text>
+        <Text style={styles.statsBest}>
+          Best streak: {stats.bestStreak} day
+          {stats.bestStreak === 1 ? "" : "s"}
+        </Text>
+        {stats.streakDays >= 3 &&
+          stats.streakDays === stats.bestStreak &&
+          stats.bestStreak > 0 && (
+          <Text style={styles.statsBadge}>
+            🔥 New best streak!
+          </Text>
+        )}
+        {/* Weekly mini bar chart */}
+        <View style={styles.weeklyChartContainer}>
+          {weeklySeries.map((day) => {
+            const ratio = day.minutes / maxWeekly;
+            const barHeight = maxWeekly === 0 ? 4 : Math.max(4, ratio * 40); // px
+            return (
+              <View key={day.key} style={styles.weeklyBarWrapper}>
+                <View style={styles.weeklyBarTrack}>
+                  <View
+                    style={[
+                      styles.weeklyBarFill,
+                      { height: barHeight }
+                    ]}
+                  />
+                </View>
+                <Text style={styles.weeklyBarLabel}>{day.label}</Text>
+              </View>
+            );
+          })}
+        </View>
+
         <Text style={styles.statsFootnote}>
           *Streak ends on your most recent reading day.
         </Text>
@@ -271,6 +389,35 @@ const styles = StyleSheet.create({
     color: "#2b5b34",
     marginTop: 4
   },
+  weeklyChartContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginTop: 6,
+    marginBottom: 4,
+    height: 44
+  },
+  weeklyBarWrapper: {
+    flex: 1,
+    alignItems: "center"
+  },
+  weeklyBarTrack: {
+    width: 10,
+    height: 40,
+    borderRadius: 5,
+    backgroundColor: "#dde2ff",
+    justifyContent: "flex-end",
+    overflow: "hidden"
+  },
+  weeklyBarFill: {
+    width: 10,
+    borderRadius: 5,
+    backgroundColor: "#4a6cff"
+  },
+  weeklyBarLabel: {
+    fontSize: 10,
+    color: "#555",
+    marginTop: 2
+  },
   statsFootnote: { fontSize: 10, color: "#777", marginTop: 2 },
   banner: {
     padding: 8,
@@ -317,5 +464,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 4
+  },
+  statsBest: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#2b3a70",
+    marginTop: 2
+  },
+  statsBadge: {
+    fontSize: 11,
+    color: "#d35400",
+    fontWeight: "600",
+    marginTop: 2
   }
 });
