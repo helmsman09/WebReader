@@ -10,5 +10,11 @@ export default defineConfig({
   ],
   build: {
     outDir: "dist"
+  },
+  server: {
+    // Allow the extension pages (chrome-extension://...) to access Vite dev server
+    cors: {
+      origin: [/chrome-extension:\/\//]
+    }
   }
 });
