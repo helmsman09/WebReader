@@ -22,6 +22,9 @@ import {
   defaultJobOptions
 } from "./queues/queues";
 import authDeviceRouter from "./routes/auth";
+import authMergeRouter from "./routes/authMerge";
+import meDevicesRouter from "./routes/meDevices";
+import meDevicesActionsRouter from "./routes/meDevicesActions";
 
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/news_capture";
@@ -35,6 +38,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use("/api/auth", authDeviceRouter);
+app.use("/api/auth", authMergeRouter);
+app.use("/api", meDevicesRouter);
+app.use("/api", meDevicesActionsRouter);
 
 const upload = multer({ dest: path.join(process.cwd(), "tmp_uploads") });
 

@@ -5,6 +5,10 @@ import { PageContentRenderer } from "./components/PageContentRenderer";
 import { UploadModal } from "./components/UploadModal";
 import type { TtsVoiceProfile } from "@news-capture/types";
 import { ApiKeyPanel } from "./components/ApiKeyPanel";
+import { LinkedDevicesPanel } from "./components/LinkedDevicesPanel";
+import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
+import { EmailLoginPanel } from "./components/EmailLoginPanel";
+
 
 const API_BASE = "http://localhost:4000";
 type WeeklyDayStat = {
@@ -682,11 +686,20 @@ export const App: React.FC = () => {
               >
                 {/* API key + QR */}
                 {apiKey && (
-                  <ApiKeyPanel
-                    apiKey={apiKey}
-                    backendUrl={API_BASE}
-                    dashboardUrl={window.location.origin}
-                  />
+                  <>
+                    <ApiKeyPanel
+                      apiKey={apiKey}
+                      backendUrl={API_BASE}
+                      dashboardUrl={window.location.origin}
+                    />
+                    <UpgradeAccountPanel apiBase={API_BASE} apiKey={apiKey} />
+                    <EmailLoginPanel
+                      apiBase={API_BASE}
+                      currentApiKey={apiKey}
+                      onLoggedIn={(newKey) => setApiKey(newKey)}
+                    />
+                    <LinkedDevicesPanel apiBase={API_BASE} apiKey={apiKey} />
+                  </>
                 )}
                 {/* Streak stats + badge */}
                 <div style={{ marginBottom: 8 }}>

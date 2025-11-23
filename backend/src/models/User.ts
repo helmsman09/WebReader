@@ -1,12 +1,15 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { Schema, model, type Document, type Types } from "mongoose";
 
 export interface IUser extends Document {
   email?: string;
   passwordHash?: string;
   apiKey: string;
-  createdAt: Date;
   deviceLabel?: string;
   upgradeParentUserId?: Types.ObjectId | null;  // <— correct TS type
+  isRevoked?: boolean;
+  lastSeenAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -19,8 +22,13 @@ const UserSchema = new Schema<IUser>(
     apiKey: { type: String, required: true, unique: true },
     deviceLabel: { type: String },
 
-    // Later, if user upgrades to email login
-    upgradeParentUserId: { type: Schema.Types.ObjectId }
+    // If this is a child device user linked to a full account
+    upgradeParentUserId: { type: Schema.Types.ObjectId, ref: "User" },
+
+    // For revocation
+    isRevoked: { type: Boolean, default: false },
+
+    lastSeenAt: { type: Date }
   },
   { timestamps: { createdAt: true, updatedAt: true } }
 );
