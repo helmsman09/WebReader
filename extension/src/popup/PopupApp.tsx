@@ -51,10 +51,10 @@ export const PopupApp: React.FC = () => {
   };
 
   const handleCapture = () => {
-    if (!settings.backendUrl || !settings.apiKey) {
+    if (!settings.backendUrl) {
       setStatus({
         state: "error",
-        message: "Set backend URL and API key first."
+        message: "Set backend URL first."
       });
       return;
     }

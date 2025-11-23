@@ -4,6 +4,7 @@ import { TagEditor } from "./components/TagEditor";
 import { PageContentRenderer } from "./components/PageContentRenderer";
 import { UploadModal } from "./components/UploadModal";
 import type { TtsVoiceProfile } from "@news-capture/types";
+import { ApiKeyPanel } from "./components/ApiKeyPanel";
 
 const API_BASE = "http://localhost:4000";
 type WeeklyDayStat = {
@@ -679,6 +680,14 @@ export const App: React.FC = () => {
                   overflowY: "auto"
                 }}
               >
+                {/* API key + QR */}
+                {apiKey && (
+                  <ApiKeyPanel
+                    apiKey={apiKey}
+                    backendUrl={API_BASE}
+                    dashboardUrl={window.location.origin}
+                  />
+                )}
                 {/* Streak stats + badge */}
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>Streak</div>

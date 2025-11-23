@@ -320,7 +320,21 @@ const LibraryScreen: React.FC = () => {
           *Streak ends on your most recent reading day.
         </Text>
       </View>
-
+      <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4 }}>
+        <TouchableOpacity
+          onPress={() => nav.navigate("LinkFromQR")}
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: "#ccc",
+            backgroundColor: "#fff"
+          }}
+        >
+          <Text style={{ fontSize: 11 }}>Link from QR</Text>
+        </TouchableOpacity>
+      </View>
       {showSuccessBanner && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>
