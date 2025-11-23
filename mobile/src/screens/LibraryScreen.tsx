@@ -15,6 +15,8 @@ import {
 } from "@react-navigation/native";
 import type { RootStackParamList } from "../../App";
 import type { PageDTO } from "@news-capture/types";
+import { useApiKey } from "../hooks/useApiKey";
+
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Library">;
 type Route = RouteProp<RootStackParamList, "Library">;
@@ -204,7 +206,12 @@ const LibraryScreen: React.FC = () => {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const apiKey = ""; // TODO: fill from secure storage
+  const { apiKey, loading: apiKeyLoading } = useApiKey("Mobile app");
+
+  useEffect(() => {
+    if (!apiKey || apiKeyLoading) return;
+      void loadPages();
+  }, [apiKey, apiKeyLoading]);
 
   const loadPages = async () => {
     if (!apiKey) return;
@@ -247,6 +254,14 @@ const LibraryScreen: React.FC = () => {
         : 1,
     [weeklySeries]
   );
+
+  if (apiKeyLoading || !apiKey) {
+    return (
+      <View style={styles.container}>
+        <Text>Initializing reading profile…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

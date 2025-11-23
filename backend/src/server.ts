@@ -21,6 +21,7 @@ import {
   ttsQueue,
   defaultJobOptions
 } from "./queues/queues";
+import authDeviceRouter from "./routes/auth";
 
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/news_capture";
@@ -33,6 +34,7 @@ mongoose
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
+app.use("/api/auth", authDeviceRouter);
 
 const upload = multer({ dest: path.join(process.cwd(), "tmp_uploads") });
 

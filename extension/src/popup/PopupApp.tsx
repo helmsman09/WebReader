@@ -152,6 +152,7 @@ export const PopupApp: React.FC = () => {
         <input
           type="text"
           value={settings.dashboardUrl || ""}
+          placeholder="http://localhost:5173"
           onChange={(e) =>
             updateSettings({dashboardUrl: e.target.value })
           }
@@ -198,9 +199,19 @@ export const PopupApp: React.FC = () => {
             }}
             onClick={() => {
               // dashboardUrl must exist in extension settings (sync storage)
-              const dash = settings.dashboardUrl || "http://localhost:5174";
-              const url = `${dash}/#/page/${status.pageId}`;
-              chrome.tabs.create({ url });
+              chrome.storage.sync.get(["dashboardUrl", "apiKey"], (res) => {
+                const dash = res.dashboardUrl || "http://localhost:5174";
+                const apiKey = res.apiKey;
+                if (!apiKey) {
+                  chrome.tabs.create({ url: dash });
+                  return;
+                }
+                const url = `${dash.replace(/\/$/, "")}/?apiKey=${encodeURIComponent(
+                  apiKey
+                  )}#/page/${status.pageId}`;
+                // const url = `${dash}/#/page/${status.pageId}`;
+                chrome.tabs.create({ url });
+              });
             }}
           >
             View in dashboard →

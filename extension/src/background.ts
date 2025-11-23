@@ -7,15 +7,49 @@ type BgMessage =
 function getSettings(): Promise<ExtensionSettings> {
   return new Promise((resolve) => {
     chrome.storage.sync.get(
-      ["backendUrl", "apiKey", "defaultSharingMode"],
+      ["backendUrl", "apiKey", "defaultSharingMode", "dashboardUrl"],
       (res) => {
         resolve({
           backendUrl: res.backendUrl || "",
           apiKey: res.apiKey || "",
-          defaultSharingMode: res.defaultSharingMode || "private"
+          defaultSharingMode: res.defaultSharingMode || "private",
+          dashboardUrl: res.dashboardUrl || ""
         });
       }
     );
+  });
+}
+async function ensureApiKey(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(["apiKey", "backendUrl"], async (res) => {
+      let apiKey = res.apiKey as string | undefined;
+      const backendUrl = res.backendUrl || "http://localhost:4000";
+
+      if (apiKey) {
+        return resolve(apiKey);
+      }
+
+      try {
+        const resp = await fetch(`${backendUrl.replace(/\/$/, "")}/api/auth/device`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceLabel: "Chrome extension" })
+        });
+
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => "");
+          throw new Error(txt || "Failed to create device key");
+        }
+
+        const data = await resp.json();
+        apiKey = data.apiKey;
+        chrome.storage.sync.set({ apiKey });
+        resolve(apiKey);
+      } catch (e) {
+        console.error("ensureApiKey error", e);
+        reject(e);
+      }
+    });
   });
 }
 
@@ -47,7 +81,7 @@ async function captureActiveTabAndUpload(): Promise<{
 
   const page: CapturedPage = captureResponse.page;
 
-  const body = {
+  const payload = {
     title: page.title,
     tags: [],
     sharingMode: settings.defaultSharingMode,
@@ -58,15 +92,17 @@ async function captureActiveTabAndUpload(): Promise<{
     meta: page.meta
   };
 
+  const backendUrl = settings.backendUrl || "http://localhost:4000";
+  const apiKey = await ensureApiKey();
   const res = await fetch(
-    settings.backendUrl.replace(/\/$/, "") + "/api/uploads/page",
+    backendUrl.replace(/\/$/, "") + "/api/uploads/page",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.apiKey}`
+        Authorization: `Bearer ${apiKey}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(payload)
     }
   );
 

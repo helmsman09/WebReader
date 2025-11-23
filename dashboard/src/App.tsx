@@ -24,6 +24,27 @@ type CalendarCell = {
   level: 0 | 1 | 2 | 3;
 };
 
+function getOrInitApiKey(): string | null {
+  // 1) URL param ?apiKey=
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get("apiKey");
+  if (fromUrl) {
+    localStorage.setItem("nc_api_key", fromUrl);
+    // optionally, strip query param (not required)
+    return fromUrl;
+  }
+
+  // 2) Saved in localStorage
+  const stored = localStorage.getItem("nc_api_key");
+  if (stored) {
+    return stored;
+  }
+
+  // 3) No key? Let this browser have its own device key
+  //    (this case applies when user visits dashboard directly, not from extension)
+  return null;
+}
+
 function computeStreakStats(pages: Page[]): StreakStats {
   if (!pages.length) return { currentStreak: 0, bestStreak: 0 };
 
@@ -399,16 +420,36 @@ const WeeklyChartPanel: React.FC<{ series: WeeklyDayStat[] }> = ({
 };
 
 export const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(() => getOrInitApiKey());
+  const [initializing, setInitializing] = useState(false);
+
   const [pages, setPages] = useState<Page[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const apiKey = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("API_KEY") || "";
-  }, []);
+  useEffect(() => {
+    if (apiKey) return;
+
+    const init = async () => {
+      setInitializing(true);
+      try {
+        const resp = await fetch("http://localhost:4000/api/auth/device", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceLabel: "Web dashboard" })
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        localStorage.setItem("nc_api_key", data.apiKey);
+        setApiKey(data.apiKey);
+      } finally {
+        setInitializing(false);
+      }
+    };
+    void init();
+  }, [apiKey]);
 
   useEffect(() => {
     if (!apiKey) return;
