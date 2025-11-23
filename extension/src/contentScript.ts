@@ -219,6 +219,8 @@ function collectPageData(): CapturedPage {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  console.log("[content] got message", msg);
+
   if (!msg || typeof msg !== "object") return;
 
   if (msg.type === "CAPTURE_PAGE") {

@@ -22,7 +22,7 @@ function getSettings(): Promise<ExtensionSettings> {
 async function ensureApiKey(): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get(["apiKey", "backendUrl"], async (res) => {
-      let apiKey = res.apiKey as string | undefined;
+      let apiKey = res.apiKey as string || "";
       const backendUrl = res.backendUrl || "http://localhost:4000";
 
       if (apiKey) {
@@ -53,10 +53,40 @@ async function ensureApiKey(): Promise<string> {
   });
 }
 
+async function collectPageDataFromTab(tabId: number): Promise<any> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: "CAPTURE_PAGE" },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          // This is where "Could not establish connection" shows up
+          console.warn(
+            "collectPageDataFromTab error",
+            chrome.runtime.lastError.message
+          );
+          reject(
+            new Error(
+              "Cannot capture this page (no content script / restricted page)."
+            )
+          );
+          return;
+        }
+        if (!response) {
+          reject(new Error("No response from content script."));
+          return;
+        }
+        resolve(response);
+      }
+    );
+  });
+}
+
 async function captureActiveTabAndUpload(): Promise<{
   ok: boolean;
   error?: string;
   pageTitle?: string;
+  pageId?: string;
 }> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
@@ -64,13 +94,10 @@ async function captureActiveTabAndUpload(): Promise<{
   }
 
   const settings = await getSettings();
-  if (!settings.backendUrl || !settings.apiKey) {
-    return { ok: false, error: "Missing backend URL or API key" };
-  }
 
-  const captureResponse = await chrome.tabs.sendMessage(tab.id, {
-    type: "CAPTURE_PAGE"
-  });
+
+
+  const captureResponse = await collectPageDataFromTab(tab.id!);
 
   if (!captureResponse?.ok) {
     return {

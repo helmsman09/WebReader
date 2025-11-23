@@ -9,7 +9,8 @@ export default defineConfig({
     crx({ manifest })
   ],
   build: {
-    outDir: "dist"
+    outDir: "dist",
+    emptyOutDir: true,
   },
   server: {
     // Allow the extension pages (chrome-extension://...) to access Vite dev server

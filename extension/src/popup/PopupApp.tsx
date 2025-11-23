@@ -61,10 +61,11 @@ export const PopupApp: React.FC = () => {
     setStatus({ state: "capturing" });
     chrome.runtime.sendMessage({ type: "POPUP_CAPTURE_PAGE" }, (response) => {
       if (chrome.runtime.lastError) {
-        setStatus({
-          state: "error",
-          message: chrome.runtime.lastError.message || "Capture failed."
-        });
+        const raw = chrome.runtime.lastError.message || "";
+        const friendly = raw.includes("Could not establish connection")
+          ? "This page cannot be captured (no script or restricted URL). Try another site."
+          : raw || "Capture failed.";
+        setStatus({ state: "error", message: friendly });
         return;
       }
       if (!response || !response.ok) {
