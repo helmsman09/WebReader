@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { apiKeyAuth, AuthedRequest } from "../middleware/auth";
 import { User } from "../models/User";
+import { Page } from "../models/Page";
 import { generateApiKey } from "../utils/apiKey";
 
 const router = express.Router();
@@ -122,5 +123,64 @@ router.post("/login-email", async (req, res) => {
   }
 });
 
+/**
+ * Email/password login specifically for the Chrome extension.
+ *
+ * Body:
+ *  - email: string
+ *  - password: string
+ *  - currentApiKey?: string   // extension's current device key to merge from (optional)
+ *  - deviceLabel?: string     // optional label, defaults to "Chrome extension"
+ */
+router.post("/login-email-extension", async (req, res) => {
+  try {
+    const { email, password, currentApiKey, deviceLabel } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).send("Email and password are required.");
+    }
+
+    const rootUser = await User.findOne({ email }).exec();
+    if (!rootUser || !rootUser.passwordHash) {
+      return res.status(400).send("Invalid email or password.");
+    }
+
+    const ok = await bcrypt.compare(password, rootUser.passwordHash);
+    if (!ok) {
+      return res.status(400).send("Invalid email or password.");
+    }
+
+    // Optional: merge from existing device apiKey (the extension's old key)
+    if (currentApiKey && typeof currentApiKey === "string") {
+      const deviceUser = await User.findOne({ apiKey: currentApiKey }).exec();
+      if (deviceUser && !deviceUser._id.equals(rootUser._id)) {
+        await Page.updateMany(
+          { userId: deviceUser._id },
+          { $set: { userId: rootUser._id } }
+        ).exec();
+
+        deviceUser.upgradeParentUserId = rootUser._id;
+        await deviceUser.save();
+      }
+    }
+
+    // Create a *new* device user row for this extension instance
+    const newApiKey = generateApiKey();
+    const extensionDevice = await User.create({
+      apiKey: newApiKey,
+      deviceLabel: deviceLabel || "Chrome extension",
+      upgradeParentUserId: rootUser._id
+    });
+
+    res.json({
+      ok: true,
+      apiKey: extensionDevice.apiKey,
+      rootUserId: rootUser._id,
+      deviceUserId: extensionDevice._id
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).send("Extension login failed.");
+  }
+});
 
 export default router;

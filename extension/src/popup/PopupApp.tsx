@@ -20,10 +20,131 @@ const defaultSettings: ExtensionSettings = {
   dashboardUrl: ""
 };
 
+async function loginExtensionWithEmail(
+  backendUrl: string,
+  currentApiKey: string | undefined,
+  email: string,
+  password: string
+): Promise<string> {
+  const base = backendUrl.replace(/\/$/, "") || "http://localhost:4000";
+
+  const resp = await fetch(
+    `${base}/api/auth/login-email-extension`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        currentApiKey,
+        deviceLabel: "Chrome extension"
+      })
+    }
+  );
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text || "Login failed");
+  }
+
+  const data = await resp.json().catch(() => null);
+  if (!data || !data.apiKey) {
+    throw new Error("No apiKey returned from server.");
+  }
+
+  const newApiKey = data.apiKey as string;
+
+  // Persist to chrome storage so background uses it too
+  await new Promise<void>((resolve) => {
+    chrome.storage.sync.set({ apiKey: newApiKey }, () => resolve());
+  });
+
+  return newApiKey;
+}
+async function loginExtensionWithEmail(
+  backendUrl: string,
+  currentApiKey: string | undefined,
+  email: string,
+  password: string
+): Promise<string> {
+  const base = backendUrl.replace(/\/$/, "") || "http://localhost:4000";
+
+  const resp = await fetch(
+    `${base}/api/auth/login-email-extension`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        currentApiKey,
+        deviceLabel: "Chrome extension"
+      })
+    }
+  );
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text || "Login failed");
+  }
+
+  const data = await resp.json().catch(() => null);
+  if (!data || !data.apiKey) {
+    throw new Error("No apiKey returned from server.");
+  }
+
+  const newApiKey = data.apiKey as string;
+
+  // Persist to chrome storage so background uses it too
+  await new Promise<void>((resolve) => {
+    chrome.storage.sync.set({ apiKey: newApiKey }, () => resolve());
+  });
+
+  return newApiKey;
+}
+
 export const PopupApp: React.FC = () => {
   const [settings, setSettings] = useState<ExtensionSettings>(defaultSettings);
   const [status, setStatus] = useState<CaptureStatus>({ state: "idle" });
   const [lastCapture, setLastCapture] = useState<LastCapture | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+
+  const canSubmitLogin =
+    !loginSubmitting &&
+    loginEmail.trim().length > 3 &&
+    loginPassword.length >= 6 &&
+    settings.backendUrl.trim().length > 0;
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmitLogin) return;
+
+    setLoginSubmitting(true);
+    setLoginError(null);
+    try {
+      const newKey = await loginExtensionWithEmail(
+        settings.backendUrl,
+        settings.apiKey || undefined,
+        loginEmail.trim(),
+        loginPassword
+      );
+      // Update local settings state
+      setSettings((prev) => ({
+        ...prev,
+        apiKey: newKey
+      }));
+      setLoginSuccess(true);
+    } catch (err: any) {
+      setLoginError(err.message || "Login failed");
+      setLoginSuccess(false);
+    } finally {
+      setLoginSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     chrome.storage.sync.get(
@@ -160,6 +281,77 @@ export const PopupApp: React.FC = () => {
           style={{ width: "100%" }}
         />
       </div>
+      <div
+        style={{
+          marginTop: 6,
+          padding: 6,
+          borderRadius: 6,
+          border: "1px solid #dde2ff",
+          background: "#f4f6ff"
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
+          Log in with email
+        </div>
+        <div style={{ fontSize: 10, color: "#555", marginBottom: 4 }}>
+          If you’ve upgraded to a full account, link this extension to it using
+          your email and password.
+        </div>
+
+        {loginSuccess ? (
+          <div style={{ fontSize: 11, color: "#2b5b34" }}>
+            ✅ Logged in. This extension now uses your full account.
+          </div>
+        ) : (
+          <form onSubmit={handleEmailLogin}>
+            <div style={{ marginBottom: 4 }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  fontSize: 11,
+                  padding: 4,
+                  marginBottom: 2
+                }}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  fontSize: 11,
+                  padding: 4
+                }}
+              />
+            </div>
+            {loginError && (
+              <div style={{ fontSize: 10, color: "#b00020", marginBottom: 4 }}>
+                {loginError}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={!canSubmitLogin}
+              style={{
+                fontSize: 11,
+                padding: "3px 8px",
+                borderRadius: 4,
+                border: "1px solid #4a6cff",
+                background: canSubmitLogin ? "#e0e7ff" : "#f5f5f5",
+                cursor: canSubmitLogin ? "pointer" : "default"
+              }}
+            >
+              {loginSubmitting ? "Logging in…" : "Log in"}
+            </button>
+          </form>
+        )}
+      </div>
+
 
       <button
         onClick={handleCapture}

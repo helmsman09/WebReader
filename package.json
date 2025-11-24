@@ -17,5 +17,13 @@
     "build": "npm run build:types && npm run build:backend && npm run build:dashboard && npm run build:extension",
 
     "typecheck": "npm run typecheck --workspaces"
+  },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "overrides": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   }
 }
