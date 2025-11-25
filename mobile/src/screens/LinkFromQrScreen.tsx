@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Button, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { CameraView, useCameraPermissions } from "expo-camera";
-import type {MiniNav} from "../../App"
-type Props = { nav: MiniNav };
+import type { ScreenComponentProps } from "../navigation/MiniNav";
+type Props = ScreenComponentProps<"LinkFromQR">;
 
 export const LinkFromQrScreen: React.FC<Props> = ({nav}) => {
 
@@ -81,6 +81,7 @@ export const LinkFromQrScreen: React.FC<Props> = ({nav}) => {
         Point your camera at the QR code on your dashboard to link this device
         to the same reading profile.
       </Text>
+      <Button title="Cancel" onPress={() => nav.goBack()} />
       <View style={styles.scannerBox}>
         <CameraView
           style={{ width: "100%", height: "100%" }}

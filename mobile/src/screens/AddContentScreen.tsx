@@ -4,25 +4,26 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Button,
   StyleSheet,
   ScrollView,
   Alert,
   ActivityIndicator
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import type {MiniNav} from "../../App"
 
 type Mode = "text" | "pdf" | "audio";
 type Template = "image-top-text" | "image-flow" | "text-only" | "audio-only";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
 
 const MAX_FILE_MB = 50;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
-type Props = {
-  nav: MiniNav;
-};
+import type { ScreenComponentProps } from "../navigation/MiniNav";
+
+type Props = ScreenComponentProps<"AddContent">;
 
 export const AddContentScreen: React.FC<Props> = ({nav}) => {
   const [template, setTemplate] = useState<Template>("text-only");
@@ -92,13 +93,16 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
       copyToCacheDirectory: true
     });
 
-    if (result.type === "success") {
-      const asset = result.assets[0];
-      if (!validatePickedFile(kind, asset)) {
-        return;
-      }
-      setFile(asset);
+    // New API: `canceled` + `assets`
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      // user cancelled or no file selected
+      return;
     }
+    const asset = result.assets[0];
+    if (!validatePickedFile(kind, asset)) {
+      return;
+    }
+    setFile(asset);
   };
 
   const handleSubmit = async () => {
@@ -116,7 +120,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
           return;
         }
 
-        const res = await fetch(`${API_BASE}/api/uploads/text`, {
+        const res = await fetch(`${API_BASE_URL}/api/uploads/text`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -160,7 +164,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
         const endpoint =
           mode === "pdf" ? "/api/uploads/pdf" : "/api/uploads/audio";
 
-        const res = await fetch(`${API_BASE}${endpoint}`, {
+        const res = await fetch(`${API_BASE_URL}${endpoint}`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`
@@ -174,7 +178,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
       }
 
       Alert.alert("Saved", "Your content was added.");
-      nav.navigate({ name: "PageDetail", params: { pageId: "123" }});
+      nav.reset("Library", { justUploaded: true })
     } catch (e: any) {
       console.log(e);
       Alert.alert("Upload error", e.message || "Failed to upload");
@@ -191,7 +195,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>Add content</Text>
-
+      <Button title="Back" onPress={() => nav.goBack()} />
       <Text style={styles.label}>Template</Text>
       <View style={styles.row}>
         {(

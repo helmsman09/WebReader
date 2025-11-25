@@ -7,22 +7,13 @@ import {
   StyleSheet,
   RefreshControl
 } from "react-native";
-import type {MiniNav} from "../../App"
-/*
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import {
-  useNavigation,
-  useRoute,
-  RouteProp
-} from "@react-navigation/native";
- */
+
 import type { PageDTO } from "@news-capture/types";
 import { useApiKey } from "../hooks/useApiKey";
 
-type Props = {
-  nav: MiniNav;
-  justUploaded?: boolean;
-};
+import type { MiniNav, ScreenComponentProps } from "../navigation/MiniNav";
+
+type Props = ScreenComponentProps<"Library">;
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
@@ -202,9 +193,8 @@ function buildWeeklySeries(pages: PageDTO[]): WeeklyDay[] {
   return series;
 }
 
-export const LibraryScreen: React.FC<Props> = ({ nav, justUploaded }) => {
-  // Your old logic, but instead of navigation.navigate:
-  // nav.goToAddContent(); nav.goToPageDetail({ pageId: "..." }), etc.
+export const LibraryScreen: React.FC<Props> = ({ nav, route }) => {
+  const justUploaded = route.params?.justUploaded;
 
   const [pages, setPages] = useState<PageDTO[]>([]);
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
@@ -326,7 +316,7 @@ export const LibraryScreen: React.FC<Props> = ({ nav, justUploaded }) => {
       </View>
       <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4 }}>
         <TouchableOpacity
-          onPress={() => nav.navigate({ name: "LinkFromQR" })}
+          onPress={() => nav.navigate("LinkFromQR")}
           style={{
             paddingHorizontal: 10,
             paddingVertical: 4,
@@ -359,7 +349,7 @@ export const LibraryScreen: React.FC<Props> = ({ nav, justUploaded }) => {
             <TouchableOpacity
               style={styles.card}
               onPress={() =>
-                nav.navigate({ name: "PageDetail", params:{pageId: item._id} })
+                nav.navigate("PageDetail", { pageId: item._id })
               }
             >
               <Text style={styles.title}>
@@ -384,7 +374,7 @@ export const LibraryScreen: React.FC<Props> = ({ nav, justUploaded }) => {
       />
 
       <TouchableOpacity
-        onPress={() => nav.navigate({ name: "AddContent"})}
+        onPress={() => nav.navigate("AddContent")}
         style={styles.fab}
       >
         <Text style={{ color: "#fff", fontSize: 28, marginTop: -3 }}>

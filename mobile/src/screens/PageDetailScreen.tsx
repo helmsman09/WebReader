@@ -5,20 +5,20 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Button,
   Alert
 } from "react-native";
 import { Audio } from "expo-av";
 import type { PageDTO, TtsVoiceProfile } from "@news-capture/types";
-import type {MiniNav} from "../../App"
+import type { ScreenComponentProps } from "../navigation/MiniNav";
 
-const API_BASE = "http://localhost:4000";
+type Props = ScreenComponentProps<"PageDetail">;
 
-type Props = {
-  nav: MiniNav;
-  pageId?: string;
-};
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
 
-export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
+export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
+  const { pageId } = route.params;
   const [page, setPage] = useState<PageDTO | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -33,7 +33,7 @@ export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
 
   const reload = async () => {
     if (!apiKey) return;
-    const res = await fetch(`${API_BASE}/api/me/pages`, {
+    const res = await fetch(`${API_BASE_URL}/api/me/pages`, {
       headers: { Authorization: `Bearer ${apiKey}` }
     });
     if (!res.ok) return;
@@ -62,7 +62,7 @@ export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
     try {
       setSummaryLoading(true);
       const res = await fetch(
-        `${API_BASE}/api/pages/${page._id}/summary`,
+        `${API_BASE_URL}/api/pages/${page._id}/summary`,
         {
           method: "POST",
           headers: {
@@ -93,7 +93,7 @@ export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
     try {
       setTtsLoading(true);
       const res = await fetch(
-        `${API_BASE}/api/pages/${page._id}/tts`,
+        `${API_BASE_URL}/api/pages/${page._id}/tts`,
         {
           method: "POST",
           headers: {
@@ -167,7 +167,7 @@ export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{page.title || "(No title)"}</Text>
       <Text style={styles.url}>{page.url}</Text>
-
+      <Button title="Back" onPress={() => nav.goBack()} />
       <View style={styles.summaryBox}>
         <View style={styles.summaryHeaderRow}>
           <Text style={styles.summaryHeader}>Summary</Text>

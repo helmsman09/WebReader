@@ -1,55 +1,29 @@
-// App.tsx in mobile
+// App.tsx (mobile)
 
-import React, { useState } from "react";
-import { View, Text } from "react-native";
+import React from "react";
+import { MiniNavigator, MiniNavigatorScreens } from "./src/navigation/MiniNav";
+import { RootStackParamList } from "./src/navigation/RootStack";
+
 import { LibraryScreen } from "./src/screens/LibraryScreen";
 import { AddContentScreen } from "./src/screens/AddContentScreen";
 import { PageDetailScreen } from "./src/screens/PageDetailScreen";
 import { LinkFromQrScreen } from "./src/screens/LinkFromQrScreen";
 
-type ScreenName = "Library" | "AddContent" | "PageDetail" | "LinkFromQR";
-
-type ScreenState =
-  | { name: "Library"; params?: { justUploaded?: boolean } }
-  | { name: "AddContent" }
-  | { name: "PageDetail"; params: { pageId: string } }
-  | { name: "LinkFromQR" };
-
-export type MiniNav = {
-  navigate: (screen: ScreenState) => void;
-  goBack: () => void;
+// Tell TS the shape of the screens map
+const screens: MiniNavigatorScreens = {
+  Library: LibraryScreen,
+  AddContent: AddContentScreen,
+  PageDetail: PageDetailScreen,
+  LinkFromQR: LinkFromQrScreen,
 };
 
 export default function App() {
-  const [stack, setStack] = useState<ScreenState[]>([
-    { name: "Library" },
-  ]);
-
-  const nav: MiniNav = {
-    navigate: (screen) => {
-      setStack((prev) => [...prev, screen]);
-    },
-
-    goBack: () => {
-      setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
-    },
-  };
-
-  const current = stack[stack.length - 1];
-
-  // Render current screen
-  if (current.name === "Library") {
-    return <LibraryScreen nav={nav} justUploaded={current.params?.justUploaded} />;
-  }
-  if (current.name === "AddContent") {
-    return <AddContentScreen nav={nav} />;
-  }
-  if (current.name === "PageDetail") {
-    return <PageDetailScreen nav={nav} pageId={current.params.pageId} />;
-  }
-  if (current.name === "LinkFromQR") {
-    return <LinkFromQrScreen nav={nav} />;
-  }
-
-  return <View><Text>Unknown screen</Text></View>;
+  return (
+    <MiniNavigator
+      initialRouteName="Library"
+      screens={screens}
+      // initialParams is optional; Library has `undefined | { justUploaded?: boolean }`
+      initialParams={undefined as RootStackParamList["Library"]}
+    />
+  );
 }
