@@ -1,0 +1,8 @@
+export default {
+  expo: {
+    name: "news-capture-mobile",
+    slug: "news-capture-mobile",
+    version: "1.0.0",
+    platforms: ["ios", "android", "web"]
+  }
+};

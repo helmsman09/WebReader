@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
 
 export function useApiKey(deviceLabel: string) {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -17,7 +18,10 @@ export function useApiKey(deviceLabel: string) {
           return;
         }
 
-        const resp = await fetch(`${API_BASE}/api/auth/device`, {
+        const url = `${API_BASE_URL}/api/auth/device`;
+        console.log("createDeviceUser URL", url);  // 👈 add this
+
+        const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deviceLabel })

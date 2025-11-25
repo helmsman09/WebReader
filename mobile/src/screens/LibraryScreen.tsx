@@ -7,21 +7,25 @@ import {
   StyleSheet,
   RefreshControl
 } from "react-native";
+import type {MiniNav} from "../../App"
+/*
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   useNavigation,
   useRoute,
   RouteProp
 } from "@react-navigation/native";
-import type { RootStackParamList } from "../../App";
+ */
 import type { PageDTO } from "@news-capture/types";
 import { useApiKey } from "../hooks/useApiKey";
 
+type Props = {
+  nav: MiniNav;
+  justUploaded?: boolean;
+};
 
-type Nav = NativeStackNavigationProp<RootStackParamList, "Library">;
-type Route = RouteProp<RootStackParamList, "Library">;
-
-const API_BASE = "http://localhost:4000";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
 
 type WeeklyDay = {
   key: string;
@@ -198,9 +202,9 @@ function buildWeeklySeries(pages: PageDTO[]): WeeklyDay[] {
   return series;
 }
 
-const LibraryScreen: React.FC = () => {
-  const nav = useNavigation<Nav>();
-  const route = useRoute<Route>();
+export const LibraryScreen: React.FC<Props> = ({ nav, justUploaded }) => {
+  // Your old logic, but instead of navigation.navigate:
+  // nav.goToAddContent(); nav.goToPageDetail({ pageId: "..." }), etc.
 
   const [pages, setPages] = useState<PageDTO[]>([]);
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
@@ -216,7 +220,7 @@ const LibraryScreen: React.FC = () => {
   const loadPages = async () => {
     if (!apiKey) return;
     try {
-      const res = await fetch(`${API_BASE}/api/me/pages`, {
+      const res = await fetch(`${API_BASE_URL}/api/me/pages`, {
         headers: { Authorization: `Bearer ${apiKey}` }
       });
       if (!res.ok) return;
@@ -238,12 +242,12 @@ const LibraryScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (route.params?.justUploaded) {
+    if (justUploaded) {
       setShowSuccessBanner(true);
       const t = setTimeout(() => setShowSuccessBanner(false), 2500);
       return () => clearTimeout(t);
     }
-  }, [route.params?.justUploaded]);
+  }, [justUploaded]);
 
   const stats = useMemo(() => computeStats(pages), [pages]);
   const weeklySeries = useMemo(() => buildWeeklySeries(pages), [pages]);
@@ -322,7 +326,7 @@ const LibraryScreen: React.FC = () => {
       </View>
       <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4 }}>
         <TouchableOpacity
-          onPress={() => nav.navigate("LinkFromQR")}
+          onPress={() => nav.navigate({ name: "LinkFromQR" })}
           style={{
             paddingHorizontal: 10,
             paddingVertical: 4,
@@ -355,7 +359,7 @@ const LibraryScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.card}
               onPress={() =>
-                nav.navigate("PageDetail", { pageId: item._id })
+                nav.navigate({ name: "PageDetail", params:{pageId: item._id} })
               }
             >
               <Text style={styles.title}>
@@ -380,7 +384,7 @@ const LibraryScreen: React.FC = () => {
       />
 
       <TouchableOpacity
-        onPress={() => nav.navigate("AddContent")}
+        onPress={() => nav.navigate({ name: "AddContent"})}
         style={styles.fab}
       >
         <Text style={{ color: "#fff", fontSize: 28, marginTop: -3 }}>
@@ -390,8 +394,6 @@ const LibraryScreen: React.FC = () => {
     </View>
   );
 };
-
-export default LibraryScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },

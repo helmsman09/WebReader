@@ -10,9 +10,7 @@ import {
   ActivityIndicator
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
-import type { RootStackParamList } from "../../App";
+import type {MiniNav} from "../../App"
 
 type Mode = "text" | "pdf" | "audio";
 type Template = "image-top-text" | "image-flow" | "text-only" | "audio-only";
@@ -22,9 +20,11 @@ const API_BASE = "http://localhost:4000";
 const MAX_FILE_MB = 50;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
-const AddContentScreen: React.FC = () => {
-  const nav =
-    useNavigation<NativeStackNavigationProp<RootStackParamList, "AddContent">>();
+type Props = {
+  nav: MiniNav;
+};
+
+export const AddContentScreen: React.FC<Props> = ({nav}) => {
   const [template, setTemplate] = useState<Template>("text-only");
   const [mode, setMode] = useState<Mode>("text");
   const [title, setTitle] = useState("");
@@ -174,7 +174,7 @@ const AddContentScreen: React.FC = () => {
       }
 
       Alert.alert("Saved", "Your content was added.");
-      nav.navigate("Library", { justUploaded: true });
+      nav.navigate({ name: "PageDetail", params: { pageId: "123" }});
     } catch (e: any) {
       console.log(e);
       Alert.alert("Upload error", e.message || "Failed to upload");
@@ -336,8 +336,6 @@ const AddContentScreen: React.FC = () => {
     </ScrollView>
   );
 };
-
-export default AddContentScreen;
 
 const styles = StyleSheet.create({
   container: { padding: 16 },

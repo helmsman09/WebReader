@@ -10,7 +10,7 @@ import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
 import { EmailLoginPanel } from "./components/EmailLoginPanel";
 
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_BACKEND_URL ?? "http://192.168.1.216:4000";
 type WeeklyDayStat = {
   key: string;
   label: string;

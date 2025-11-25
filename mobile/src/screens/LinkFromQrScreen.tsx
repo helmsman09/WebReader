@@ -1,24 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
-import { BarCodeScanner } from "expo-barcode-scanner";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
-import type { RootStackParamList } from "../../App";
 
-type Nav = NativeStackNavigationProp<RootStackParamList, "LinkFromQR">;
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type {MiniNav} from "../../App"
+type Props = { nav: MiniNav };
 
-export const LinkFromQrScreen: React.FC = () => {
-  const nav = useNavigation<Nav>();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+export const LinkFromQrScreen: React.FC<Props> = ({nav}) => {
+
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
+  // Request permission on mount if we don't have it yet
   useEffect(() => {
-    (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-    })();
-  }, []);
+    if (!permission) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
 
   const handleScan = async ({ data }: { data: string }) => {
     if (scanned) return;
@@ -56,7 +54,8 @@ export const LinkFromQrScreen: React.FC = () => {
     }
   };
 
-  if (hasPermission === null) {
+  // Still initializing permission hook
+  if (!permission) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
@@ -65,7 +64,7 @@ export const LinkFromQrScreen: React.FC = () => {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.center}>
         <Text style={{ textAlign: "center" }}>
@@ -83,9 +82,12 @@ export const LinkFromQrScreen: React.FC = () => {
         to the same reading profile.
       </Text>
       <View style={styles.scannerBox}>
-        <BarCodeScanner
+        <CameraView
           style={{ width: "100%", height: "100%" }}
-          onBarCodeScanned={scanned ? undefined : handleScan}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"], // only QR, like before
+          }}
+          onBarcodeScanned={scanned ? undefined : handleScan}
         />
       </View>
       <Text style={styles.hint}>

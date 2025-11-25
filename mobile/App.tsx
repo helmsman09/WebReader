@@ -1,29 +1,55 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import LibraryScreen from "./src/screens/LibraryScreen";
-import AddContentScreen from "./src/screens/AddContentScreen";
-import PageDetailScreen from "./src/screens/PageDetailScreen";
-import LinkFromQrScreen from "./src/screens/LinkFromQrScreen";
+// App.tsx in mobile
 
-export type RootStackParamList = {
-  Library: { justUploaded?: boolean } | undefined;
-  AddContent: undefined;
-  PageDetail: { pageId: string };
-  LinkFromQR: undefined;
+import React, { useState } from "react";
+import { View, Text } from "react-native";
+import { LibraryScreen } from "./src/screens/LibraryScreen";
+import { AddContentScreen } from "./src/screens/AddContentScreen";
+import { PageDetailScreen } from "./src/screens/PageDetailScreen";
+import { LinkFromQrScreen } from "./src/screens/LinkFromQrScreen";
+
+type ScreenName = "Library" | "AddContent" | "PageDetail" | "LinkFromQR";
+
+type ScreenState =
+  | { name: "Library"; params?: { justUploaded?: boolean } }
+  | { name: "AddContent" }
+  | { name: "PageDetail"; params: { pageId: string } }
+  | { name: "LinkFromQR" };
+
+export type MiniNav = {
+  navigate: (screen: ScreenState) => void;
+  goBack: () => void;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
 export default function App() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Library" component={LibraryScreen} />
-        <Stack.Screen name="AddContent" component={AddContentScreen} />
-        <Stack.Screen name="PageDetail" component={PageDetailScreen} />
-        <Stack.Screen name="LinkFromQR" component={LinkFromQrScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  const [stack, setStack] = useState<ScreenState[]>([
+    { name: "Library" },
+  ]);
+
+  const nav: MiniNav = {
+    navigate: (screen) => {
+      setStack((prev) => [...prev, screen]);
+    },
+
+    goBack: () => {
+      setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+    },
+  };
+
+  const current = stack[stack.length - 1];
+
+  // Render current screen
+  if (current.name === "Library") {
+    return <LibraryScreen nav={nav} justUploaded={current.params?.justUploaded} />;
+  }
+  if (current.name === "AddContent") {
+    return <AddContentScreen nav={nav} />;
+  }
+  if (current.name === "PageDetail") {
+    return <PageDetailScreen nav={nav} pageId={current.params.pageId} />;
+  }
+  if (current.name === "LinkFromQR") {
+    return <LinkFromQrScreen nav={nav} />;
+  }
+
+  return <View><Text>Unknown screen</Text></View>;
 }

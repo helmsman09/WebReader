@@ -313,7 +313,7 @@ From repo root:
 ```bash
 cd mobile
 npm install  # if needed
-npm run start
+npm run dev
 ```
 
 Fill your API key in the screens where the comment says `// fill from secure storage`.

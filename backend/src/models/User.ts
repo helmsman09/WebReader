@@ -15,7 +15,7 @@ export interface IUser extends Document {
 const UserSchema = new Schema<IUser>(
   {
     // For login-based users (future feature)
-    email: { type: String, required: false, unique: true, sparse: true },
+    email: { type: String, required: false, unique: true, sparse: true, trim: true },
     passwordHash: { type: String },
 
     // For device-based no-login auth

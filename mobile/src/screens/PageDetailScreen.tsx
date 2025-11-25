@@ -8,16 +8,17 @@ import {
   Alert
 } from "react-native";
 import { Audio } from "expo-av";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
 import type { PageDTO, TtsVoiceProfile } from "@news-capture/types";
-
-type Props = NativeStackScreenProps<RootStackParamList, "PageDetail">;
+import type {MiniNav} from "../../App"
 
 const API_BASE = "http://localhost:4000";
 
-const PageDetailScreen: React.FC<Props> = ({ route }) => {
-  const { pageId } = route.params;
+type Props = {
+  nav: MiniNav;
+  pageId?: string;
+};
+
+export const PageDetailScreen: React.FC<Props> = ({pageId }) => {
   const [page, setPage] = useState<PageDTO | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -255,8 +256,6 @@ const PageDetailScreen: React.FC<Props> = ({ route }) => {
     </ScrollView>
   );
 };
-
-export default PageDetailScreen;
 
 const styles = StyleSheet.create({
   container: { padding: 16 },

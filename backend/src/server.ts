@@ -37,16 +37,22 @@ mongoose
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
-app.use("/api/auth", authDeviceRouter);
-app.use("/api/auth", authMergeRouter);
-app.use("/api", meDevicesRouter);
-app.use("/api", meDevicesActionsRouter);
 
 const upload = multer({ dest: path.join(process.cwd(), "tmp_uploads") });
 
 interface AuthedRequest extends Request {
   user?: any;
 }
+
+// before your routes
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+app.use("/api/auth", authDeviceRouter);
+app.use("/api/auth", authMergeRouter);
+app.use("/api", meDevicesRouter);
+app.use("/api", meDevicesActionsRouter);
 
 async function authWithApiKey(
   req: AuthedRequest,
@@ -587,6 +593,55 @@ function deriveAudioSourcesFromBlocks(blocks: ContentBlock[]) {
 }
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[backend] listening on http://localhost:${PORT}`);
+});
+
+// Ignore client-side connection resets (browser cancels, hot reload, etc.)
+server.on('clientError', (err: NodeJS.ErrnoException, socket) => {
+  if (err.code === 'ECONNRESET' || err.code === 'EPIPE') {
+    // client hung up, just destroy the socket quietly
+    if (!socket.destroyed) socket.destroy();
+    return;
+  }
+
+  console.error('clientError', err);
+  try {
+    if (!socket.destroyed) {
+      socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+    }
+  } catch {
+    // ignore
+  }
+});
+
+// Also ignore low-level server ECONNRESET/EPIPE
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'ECONNRESET' || err.code === 'EPIPE') {
+    return;
+  }
+  console.error('server error', err);
+});
+
+// Optional: last-resort guard so ECONNRESET doesn’t crash the process
+process.on('uncaughtException', (err: any) => {
+  if (err && (err.code === 'ECONNRESET' || err.code === 'EPIPE')) {
+    return;
+  }
+  console.error('uncaughtException', err);
+});
+
+import IORedis from 'ioredis';
+
+const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
+console.log('[backend] connecting to Redis at', redisUrl);
+
+const redis = new IORedis(redisUrl);
+
+redis.on('ready', () => {
+  console.log('[backend] Redis connected');
+});
+
+redis.on('error', (err) => {
+  console.error('[backend] Redis error:', err);
 });
