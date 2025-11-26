@@ -11,11 +11,11 @@ import {
 import { Audio } from "expo-av";
 import type { PageDTO, TtsVoiceProfile } from "@news-capture/types";
 import type { ScreenComponentProps } from "../navigation/MiniNav";
+import { getBackendUrl } from "../hooks/useApiKey";
 
 type Props = ScreenComponentProps<"PageDetail">;
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
+const backendUrl = getBackendUrl();
 
 export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
   const { pageId } = route.params;
@@ -33,7 +33,7 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
 
   const reload = async () => {
     if (!apiKey) return;
-    const res = await fetch(`${API_BASE_URL}/api/me/pages`, {
+    const res = await fetch(`${backendUrl}/api/me/pages`, {
       headers: { Authorization: `Bearer ${apiKey}` }
     });
     if (!res.ok) return;
@@ -62,7 +62,7 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
     try {
       setSummaryLoading(true);
       const res = await fetch(
-        `${API_BASE_URL}/api/pages/${page._id}/summary`,
+        `${backendUrl}/api/pages/${page._id}/summary`,
         {
           method: "POST",
           headers: {
@@ -93,7 +93,7 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
     try {
       setTtsLoading(true);
       const res = await fetch(
-        `${API_BASE_URL}/api/pages/${page._id}/tts`,
+        `${backendUrl}/api/pages/${page._id}/tts`,
         {
           method: "POST",
           headers: {

@@ -9,14 +9,13 @@ import {
 } from "react-native";
 
 import type { PageDTO } from "@news-capture/types";
-import { useApiKey } from "../hooks/useApiKey";
+import { useApiKey, getBackendUrl } from "../hooks/useApiKey";
 
 import type { MiniNav, ScreenComponentProps } from "../navigation/MiniNav";
 
 type Props = ScreenComponentProps<"Library">;
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
+const backendUrl = getBackendUrl();
 
 type WeeklyDay = {
   key: string;
@@ -207,10 +206,39 @@ export const LibraryScreen: React.FC<Props> = ({ nav, route }) => {
       void loadPages();
   }, [apiKey, apiKeyLoading]);
 
+  function bootstrapApiKeyFromHash() {
+  if (!window.location.hash.startsWith("#")) return;
+
+  const hash = window.location.hash.substring(1); // remove '#'
+  const params = new URLSearchParams(hash);
+  const keyFromHash = params.get("apikey");
+
+  if (keyFromHash) {
+    // Store it locally for this origin
+    // Note: In React Native, use AsyncStorage instead of localStorage
+    AsyncStorage.setItem("nc_api_key", keyFromHash);
+
+    // Remove key from URL so it doesn't stay in address bar / history
+    params.delete("apikey");
+    const newHash = params.toString();
+    const newUrl =
+      window.location.pathname +
+      window.location.search +
+      (newHash ? "#" + newHash : "");
+
+    window.history.replaceState(null, "", newUrl);
+    console.log("Imported apiKey from URL hash");
+  }
+}
+
+
   const loadPages = async () => {
-    if (!apiKey) return;
+    if (!apiKey){
+      bootstrapApiKeyFromHash();
+      return;
+    }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/me/pages`, {
+      const res = await fetch(`${backendUrl}/api/me/pages`, {
         headers: { Authorization: `Bearer ${apiKey}` }
       });
       if (!res.ok) return;

@@ -11,12 +11,12 @@ import {
   ActivityIndicator
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import { getBackendUrl } from "../hooks/useApiKey";
 
 type Mode = "text" | "pdf" | "audio";
 type Template = "image-top-text" | "image-flow" | "text-only" | "audio-only";
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
+const backendUrl = getBackendUrl();
 
 const MAX_FILE_MB = 50;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -120,7 +120,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
           return;
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/uploads/text`, {
+        const res = await fetch(`${backendUrl}/api/uploads/text`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -164,7 +164,7 @@ export const AddContentScreen: React.FC<Props> = ({nav}) => {
         const endpoint =
           mode === "pdf" ? "/api/uploads/pdf" : "/api/uploads/audio";
 
-        const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        const res = await fetch(`${backendUrl}${endpoint}`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`

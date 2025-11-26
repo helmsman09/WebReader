@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://192.168.1.216:4000";
+const BACKEND_URL =
+  process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://192.168.1.216:4000";
+
+export function getBackendUrl(): string {
+  if (!BACKEND_URL) {
+    throw new Error("EXPO_PUBLIC_BACKEND_URL is not defined");
+  }
+  return BACKEND_URL;
+}
 
 export function useApiKey(deviceLabel: string) {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -18,7 +25,7 @@ export function useApiKey(deviceLabel: string) {
           return;
         }
 
-        const url = `${API_BASE_URL}/api/auth/device`;
+        const url = `${BACKEND_URL}/api/auth/device`;
         console.log("createDeviceUser URL", url);  // 👈 add this
 
         const resp = await fetch(url, {

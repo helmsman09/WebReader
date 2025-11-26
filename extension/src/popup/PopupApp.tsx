@@ -13,6 +13,9 @@ type CaptureStatus =
   | { state: "error"; message: string }
   | { state: "success"; title: string; pageId: string };
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? "http://192.168.1.216:4000";
+const DASHBOARD_URL = BACKEND_URL.replace(/4000/, "5173");
+
 const defaultSettings: ExtensionSettings = {
   backendUrl: "",
   apiKey: "",
@@ -26,48 +29,7 @@ async function loginExtensionWithEmail(
   email: string,
   password: string
 ): Promise<string> {
-  const base = backendUrl.replace(/\/$/, "") || "http://localhost:4000";
-
-  const resp = await fetch(
-    `${base}/api/auth/login-email-extension`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-        currentApiKey,
-        deviceLabel: "Chrome extension"
-      })
-    }
-  );
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(text || "Login failed");
-  }
-
-  const data = await resp.json().catch(() => null);
-  if (!data || !data.apiKey) {
-    throw new Error("No apiKey returned from server.");
-  }
-
-  const newApiKey = data.apiKey as string;
-
-  // Persist to chrome storage so background uses it too
-  await new Promise<void>((resolve) => {
-    chrome.storage.sync.set({ apiKey: newApiKey }, () => resolve());
-  });
-
-  return newApiKey;
-}
-async function loginExtensionWithEmail(
-  backendUrl: string,
-  currentApiKey: string | undefined,
-  email: string,
-  password: string
-): Promise<string> {
-  const base = backendUrl.replace(/\/$/, "") || "http://localhost:4000";
+  const base = backendUrl.replace(/\/$/, "") || BACKEND_URL;
 
   const resp = await fetch(
     `${base}/api/auth/login-email-extension`,
@@ -227,7 +189,7 @@ export const PopupApp: React.FC = () => {
         <input
           value={settings.backendUrl}
           onChange={(e) => updateSettings({ backendUrl: e.target.value })}
-          placeholder="http://localhost:4000"
+          placeholder={BACKEND_URL}
           style={{
             width: "100%",
             padding: 4,
@@ -274,7 +236,7 @@ export const PopupApp: React.FC = () => {
         <input
           type="text"
           value={settings.dashboardUrl || ""}
-          placeholder="http://localhost:5173"
+          placeholder={DASHBOARD_URL}
           onChange={(e) =>
             updateSettings({dashboardUrl: e.target.value })
           }
@@ -393,7 +355,7 @@ export const PopupApp: React.FC = () => {
             onClick={() => {
               // dashboardUrl must exist in extension settings (sync storage)
               chrome.storage.sync.get(["dashboardUrl", "apiKey"], (res) => {
-                const dash = res.dashboardUrl || "http://localhost:5174";
+                const dash = res.dashboardUrl || DASHBOARD_URL;
                 const apiKey = res.apiKey;
                 if (!apiKey) {
                   chrome.tabs.create({ url: dash });

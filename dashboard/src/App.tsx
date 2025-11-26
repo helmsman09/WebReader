@@ -9,8 +9,7 @@ import { LinkedDevicesPanel } from "./components/LinkedDevicesPanel";
 import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
 import { EmailLoginPanel } from "./components/EmailLoginPanel";
 
-
-const API_BASE = import.meta.env.VITE_BACKEND_URL ?? "http://192.168.1.216:4000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? "http://192.168.1.216:4000";
 type WeeklyDayStat = {
   key: string;
   label: string;
@@ -435,12 +434,44 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (apiKey) return;
+    function bootstrapApiKeyFromHash() {
+      const hash = window.location.hash.substring(1); // remove '#'
+      const params = new URLSearchParams(hash);
+      const keyFromHash = params.get("apikey");
+
+      if (keyFromHash) {
+        // Store it locally for this origin
+        localStorage.setItem("nc_api_key", keyFromHash);
+
+        // Remove key from URL so it doesn't stay in address bar / history
+        params.delete("apikey");
+        const newHash = params.toString();
+        const newUrl =
+          window.location.pathname +
+          window.location.search +
+          (newHash ? "#" + newHash : "");
+
+        window.history.replaceState(null, "", newUrl);
+        console.log("Imported apiKey from URL hash");
+      }
+    }
+
+    if (window.location.hash.startsWith("#")){
+      bootstrapApiKeyFromHash();
+      const stored = localStorage.getItem("nc_api_key");
+      if (stored) {
+        setApiKey(stored);
+        return;
+      }
+    }
 
     const init = async () => {
+      if(apiKey) return;
       setInitializing(true);
       try {
-        const resp = await fetch("http://localhost:4000/api/auth/device", {
+        const url = `${BACKEND_URL}/api/auth/device`;
+        console.log("web dash createDeviceUser URL", url);  // 👈 add this
+        const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deviceLabel: "Web dashboard" })
@@ -462,14 +493,23 @@ export const App: React.FC = () => {
       try {
         const params = new URLSearchParams();
         if (tagFilter) params.set("tag", tagFilter);
-        const res = await fetch(`${API_BASE}/api/me/pages?${params}`, {
+        const url  = `${BACKEND_URL}/api/me/pages?${params}`;
+        const res = await fetch(url, {
           headers: { Authorization: `Bearer ${apiKey}` }
         });
+        const text = await res.text();
         if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || "Failed to load pages");
+          console.error("Backend error", res.status, url, text.slice(0, 200));
+          throw new Error(`HTTP ${res.status} for ${url}`);
         }
-        const data = await res.json();
+
+        let data: any;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          console.error("Non-JSON from backend at", url, "body:", text.slice(0, 500));
+          throw new Error("Expected JSON from backend but got non-JSON");
+        }
         setPages(data);
         if (!selectedId && data.length > 0) {
           setSelectedId(data[0]._id);
@@ -689,16 +729,16 @@ export const App: React.FC = () => {
                   <>
                     <ApiKeyPanel
                       apiKey={apiKey}
-                      backendUrl={API_BASE}
+                      backendUrl={BACKEND_URL}
                       dashboardUrl={window.location.origin}
                     />
-                    <UpgradeAccountPanel apiBase={API_BASE} apiKey={apiKey} />
+                    <UpgradeAccountPanel apiBase={BACKEND_URL} apiKey={apiKey} />
                     <EmailLoginPanel
-                      apiBase={API_BASE}
+                      apiBase={BACKEND_URL}
                       currentApiKey={apiKey}
                       onLoggedIn={(newKey) => setApiKey(newKey)}
                     />
-                    <LinkedDevicesPanel apiBase={API_BASE} apiKey={apiKey} />
+                    <LinkedDevicesPanel apiBase={BACKEND_URL} apiKey={apiKey} />
                   </>
                 )}
                 {/* Streak stats + badge */}
@@ -732,19 +772,19 @@ export const App: React.FC = () => {
 
                 {/* Existing panels */}
                 <SummaryPanel
-                  apiBase={API_BASE}
+                  apiBase={BACKEND_URL}
                   apiKey={apiKey}
                   page={selectedPage}
                   onUpdated={handlePageUpdated}
                 />
                 <TtsPanel
-                  apiBase={API_BASE}
+                  apiBase={BACKEND_URL}
                   apiKey={apiKey}
                   page={selectedPage}
                   onUpdated={handlePageUpdated}
                 />
                 <TagEditor
-                  apiBase={API_BASE}
+                  apiBase={BACKEND_URL}
                   apiKey={apiKey}
                   pageId={selectedPage._id}
                   initialTags={selectedPage.tags}
@@ -776,7 +816,7 @@ export const App: React.FC = () => {
 
       {showUpload && (
         <UploadModal
-          apiBase={API_BASE}
+          apiBase={BACKEND_URL}
           apiKey={apiKey}
           onClose={() => setShowUpload(false)}
         />
