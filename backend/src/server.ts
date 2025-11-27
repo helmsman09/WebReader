@@ -102,6 +102,28 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get(
+  "/api/me/pages/:id",
+  authWithApiKey,
+  async (req: AuthedRequest, res, next) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!._id; // adapt to your auth
+
+      // Only return pages owned by this user
+      const page = await Page.findOne({ _id: id, userId }).lean().exec();
+
+      if (!page) {
+        return res.status(404).json({ error: "Page not found" });
+      }
+
+      return res.json(page); // or { page } if you prefer
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // List pages for current user with optional tag filter
 app.get("/api/me/pages", authWithApiKey, async (req: AuthedRequest, res) => {
   try {

@@ -12,14 +12,15 @@ import { Audio } from "expo-av";
 import type { PageDTO, TtsVoiceProfile } from "@news-capture/types";
 import type { ScreenComponentProps } from "../navigation/MiniNav";
 import { getBackendUrl } from "../hooks/useApiKey";
+import { usePageDetail } from "../hooks/usePageDetail";
 
 type Props = ScreenComponentProps<"PageDetail">;
 
 const backendUrl = getBackendUrl();
 
 export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
+  console.log("PageDetail route", route);
   const { pageId } = route.params;
-  const [page, setPage] = useState<PageDTO | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [voice, setVoice] = useState<TtsVoiceProfile>("man");
@@ -29,25 +30,9 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
     "idle" | "loading" | "playing" | "paused"
   >("idle");
 
-  const apiKey = ""; // TODO: fill from secure storage
-
-  const reload = async () => {
-    if (!apiKey) return;
-    const res = await fetch(`${backendUrl}/api/me/pages`, {
-      headers: { Authorization: `Bearer ${apiKey}` }
-    });
-    if (!res.ok) return;
-    const data: PageDTO[] = await res.json();
-    const found = data.find((p) => p._id === pageId) || null;
-    setPage(found || null);
-    if (found?.tts?.voiceProfile) {
-      setVoice(found.tts.voiceProfile);
-    }
-  };
-
-  useEffect(() => {
-    void reload();
-  }, [pageId]);
+  console.log("PageDetail pageId", pageId);
+  const details = usePageDetail(pageId);
+  const { loading, page, apiKey, error, reload, updatePage } = details;
 
   useEffect(() => {
     return () => {
@@ -56,6 +41,31 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
       }
     };
   }, [sound]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, padding: 16 }}>
+        <Text>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, padding: 16 }}>
+        <Text>Error loading page: {String(error.message || error)}</Text>
+        <Button title="Retry" onPress={() => void reload()} />
+      </View>
+    );
+  }
+
+  if (!page) {
+    return (
+      <View style={{ flex: 1, padding: 16 }}>
+        <Text>No page found.</Text>
+      </View>
+    );
+  }
 
   const handleResummarize = async () => {
     if (!page || !apiKey) return;
@@ -79,7 +89,7 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
         "Summary queued",
         "A new summary will appear after a short while."
       );
-      setPage({ ...page, summary: "" });
+      updatePage({ summary: "" });
     } catch (e: any) {
       console.log(e);
       Alert.alert("Error", e.message || "Failed to queue summary");
@@ -154,14 +164,6 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
       setAudioState("idle");
     }
   };
-
-  if (!page) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading…</Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

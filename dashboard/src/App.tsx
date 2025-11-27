@@ -8,8 +8,10 @@ import { ApiKeyPanel } from "./components/ApiKeyPanel";
 import { LinkedDevicesPanel } from "./components/LinkedDevicesPanel";
 import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
 import { EmailLoginPanel } from "./components/EmailLoginPanel";
+import { getBackendUrl } from "./utils/getBackendUrl";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? "http://192.168.1.216:4000";
+const BACKEND_URL = getBackendUrl();
+
 type WeeklyDayStat = {
   key: string;
   label: string;

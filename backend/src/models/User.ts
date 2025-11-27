@@ -6,6 +6,7 @@ export interface IUser extends Document {
   apiKey: string;
   deviceLabel?: string;
   upgradeParentUserId?: Types.ObjectId | null;  // <— correct TS type
+  authProvider: string,
   isRevoked?: boolean;
   lastSeenAt?: Date;
   createdAt: Date;
@@ -25,6 +26,11 @@ const UserSchema = new Schema<IUser>(
     // If this is a child device user linked to a full account
     upgradeParentUserId: { type: Schema.Types.ObjectId, ref: "User" },
 
+    authProvider: {
+      type: String,
+      enum: ["password", "google", "device"],
+      required: false,
+    },
     // For revocation
     isRevoked: { type: Boolean, default: false },
 

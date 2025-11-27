@@ -8,7 +8,7 @@ type TagStat = {
 
 type Props = {
   apiBase: string;
-  apiKey: string;
+  apiKey: string | null;
   pageId: string;
   initialTags: string[];
   onChange?: (tags: string[]) => void;
