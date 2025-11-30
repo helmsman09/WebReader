@@ -976,23 +976,32 @@ const TtsPanel: React.FC<PanelProps> = ({
     setError(null);
     // fetch `/api/pages/:id/audio` into `audio`
     (async function fetchTtsAudio () {
-      const res = await fetch(`${apiBase}/api/pages/${page._id}/audio`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`
+      try {
+        const res = await fetch(`${apiBase}/api/pages/${page._id}/audio`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`
+          }
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          if(res.statusText === "Not Found"){
+            return null;
+          } else {
+            throw new Error(txt || "Failed to fetch page audio");
+          }
+        } else {
+          const ttsAudio = await res.json();
+          setAudio(ttsAudio);
         }
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        if(res.statusText === "Not Found"){
+      } catch(error: any){
+        if (error.message === "404") {
+          // Page has no TTS yet
           return null;
         } else {
-          throw new Error(txt || "Failed to fetch page audio");
+          throw new Error(error || "Failed to fetch page audio");
         }
-      } else {
-        const ttsAudio = await res.json();
-        setAudio(ttsAudio);
       }
     })()
   }, [page._id, page.tts?.voiceProfile]);
