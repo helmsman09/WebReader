@@ -10,6 +10,8 @@ import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
 import { EmailLoginPanel } from "./components/EmailLoginPanel";
 import { getBackendUrl } from "./lib/getBackendUrl";
 import { mediaUrl } from './lib/api';
+import { PageAudioResponse } from "./types/pageAudio";
+import { PageAudioEditor } from "./components/PageAudioEditor"
 
 const BACKEND_URL = getBackendUrl();
 
@@ -965,12 +967,32 @@ const TtsPanel: React.FC<PanelProps> = ({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audio, setAudio] = useState<PageAudioResponse | null>(null);
 
   useEffect(() => {
     if (page.tts?.voiceProfile) {
       setVoice(page.tts.voiceProfile as TtsVoiceProfile);
     }
     setError(null);
+    // fetch `/api/pages/:id/audio` into `audio`
+    async function fetchTtsAudio () {
+      const res = await fetch(`${apiBase}/api/pages/${page._id}/audio`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        }
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || "Failed to queue TTS");
+      } else {
+        return res.json();
+      }
+    }
+    const audio = fetchTtsAudio();
+    setAudio(audio);
+
   }, [page._id, page.tts?.voiceProfile]);
 
   const handleGenerate = async () => {
@@ -1065,6 +1087,9 @@ const TtsPanel: React.FC<PanelProps> = ({
           />
         </div>
       )}
+      {audio && <PageAudioEditor audio={audio} onSave={chunks => {
+        setAudio(prev => prev ? { ...prev, chunks } : prev);
+      }} />}
       {error && (
         <div style={{ fontSize: 11, color: "#b00", marginTop: 4 }}>
           {error}

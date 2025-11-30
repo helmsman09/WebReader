@@ -6,7 +6,6 @@ import type { Request } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import mime from 'mime';
 import pdfParse from "pdf-parse";
 import { User } from "./models/User";
 import { Page } from "./models/Page";
@@ -29,6 +28,7 @@ import authDeviceRouter from "./routes/auth";
 import authMergeRouter from "./routes/authMerge";
 import meDevicesRouter from "./routes/meDevices";
 import meDevicesActionsRouter from "./routes/meDevicesActions";
+import pageAudioRouter from "./routes/pageAudio"
 
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/news_capture";
@@ -55,6 +55,7 @@ app.use((req, res, next) => {
 });
 app.use("/api/auth", authDeviceRouter);
 app.use("/api/auth", authMergeRouter);
+app.use("/api/pages/:pageId/audio", pageAudioRouter);
 app.use("/api", meDevicesRouter);
 app.use("/api", meDevicesActionsRouter);
 
@@ -229,6 +230,8 @@ app.post(
     }
   }
 );
+
+
 
 // Trigger (re)summary for a page
 app.post(

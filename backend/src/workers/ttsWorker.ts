@@ -3,57 +3,12 @@ import { Worker, Job } from "bullmq";
 import mongoose from "mongoose";
 import { ttsQueue, PageJobData } from "../queues/queues";
 import { Page } from "../models/Page";
+import {synthesizeTts} from "../tts/synthesizer"
 import type { TtsVoiceProfile } from "@news-capture/types";
-import OpenAI from "openai";
 import {uploadTtsAudioToS3} from "../aws/s3"
 
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/news_capture";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-function mapVoiceProfileToProviderVoice(
-  profile: TtsVoiceProfile
-): { provider: string; voiceId: string } {
-  // Simple mapping, adjust to your needs
-  switch (profile) {
-    case "boy":
-      return { provider: "openai", voiceId: "alloy" };
-    case "girl":
-      return { provider: "openai", voiceId: "alloy" };
-    case "man":
-      return { provider: "openai", voiceId: "alloy" };
-    case "woman":
-      return { provider: "openai", voiceId: "alloy" };
-    default:
-      return { provider: "openai", voiceId: "alloy" };
-  }
-}
-
-async function synthesizeTts(
-  text: string,
-  profile: TtsVoiceProfile
-): Promise<{ audioBuffer: Buffer; provider: string }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
-
-  const { provider, voiceId } = mapVoiceProfileToProviderVoice(profile);
-
-  const response = await openai.audio.speech.create({
-    model: "gpt-4o-mini-tts",
-    voice: voiceId,
-    input: text
-  });
-
-  // @ts-ignore
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = Buffer.from(arrayBuffer);
-
-  return { audioBuffer, provider };
-}
 
 // Replace this stub with real storage (S3, GCS, etc.)
 export async function uploadAudioAndGetUrl(

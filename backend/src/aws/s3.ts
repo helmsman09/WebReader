@@ -158,3 +158,22 @@ export async function uploadTtsAudioToS3(
 
   return src;
 }
+
+export async function uploadTtsMp3(userId: string, audioBuffer: Buffer) {
+  const bucket = process.env.AWS_TTS_BUCKET!;
+  const key = `tts/${userId}/${Date.now()}.mp3`;
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: audioBuffer,
+      ContentType: "audio/mpeg",
+      ACL: "private" // or "public-read" if you need open access
+    })
+  );
+
+  const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${encodeURIComponent(key)}`;
+
+  return { key, audioUrl: publicUrl };
+}
