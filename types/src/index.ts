@@ -1,7 +1,7 @@
 export type TtsVoiceProfile = "boy" | "girl" | "man" | "woman";
 
 export interface TtsInfo {
-  audioUrl: string;
+  src: string,
   voiceProfile: TtsVoiceProfile;
   provider: string;
   createdAt: string;
@@ -121,4 +121,11 @@ export interface PageDTO {
   createdAt: string;
   updatedAt: string;
   meta?: PageMeta;
+}
+
+export interface UploadedFile {
+  originalname: string;
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
 }

@@ -66,7 +66,7 @@ const AudioSourceSchema = new Schema<AudioSource>(
 
 const TtsSchema = new Schema<TtsInfo>(
   {
-    audioUrl: String,
+    src: String,
     voiceProfile: String,
     provider: String,
     createdAt: String

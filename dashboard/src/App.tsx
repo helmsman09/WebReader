@@ -8,7 +8,8 @@ import { ApiKeyPanel } from "./components/ApiKeyPanel";
 import { LinkedDevicesPanel } from "./components/LinkedDevicesPanel";
 import { UpgradeAccountPanel } from "./components/UpgradeAccountPanel";
 import { EmailLoginPanel } from "./components/EmailLoginPanel";
-import { getBackendUrl } from "./utils/getBackendUrl";
+import { getBackendUrl } from "./lib/getBackendUrl";
+import { mediaUrl } from './lib/api';
 
 const BACKEND_URL = getBackendUrl();
 
@@ -1059,7 +1060,7 @@ const TtsPanel: React.FC<PanelProps> = ({
           </div>
           <audio
             controls
-            src={page.tts.audioUrl}
+            src={mediaUrl(page.tts.src)}
             style={{ width: "100%", marginTop: 4 }}
           />
         </div>

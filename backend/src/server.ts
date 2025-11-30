@@ -6,9 +6,11 @@ import type { Request } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import mime from 'mime';
 import pdfParse from "pdf-parse";
 import { User } from "./models/User";
 import { Page } from "./models/Page";
+import {uploadAudioAndGetUrl} from './workers/ttsWorker'
 import type {
   ContentBlock,
   PageTemplate,
@@ -16,6 +18,8 @@ import type {
   PageMeta
 } from "@news-capture/types";
 import { deriveFromBlocks } from "./utils/blocksToPageFields";
+import { extToMimeType, AudioExt, isS3Uri } from "./utils/s3utils";
+import { getSignedUrl } from "./aws/s3";
 import {
   summaryQueue,
   ttsQueue,
@@ -256,6 +260,30 @@ app.post(
     }
   }
 );
+// raw body for audio uploads
+app.use(
+  "/api/tts/upload",
+  express.raw({ type: "audio/*", limit: "20mb" }) // adjust limit
+);
+
+app.post("/api/tts/upload", async (req, res, next) => {
+  try {
+    const userId = (req as any).user?._id ?? "anonymous"; // adapt to your auth
+    const audioBuffer = req.body as Buffer;
+
+    if (!audioBuffer || !Buffer.isBuffer(audioBuffer)) {
+      return res.status(400).json({ error: "Missing audio buffer body" });
+    }
+
+    const src = await uploadAudioAndGetUrl(userId, "", audioBuffer, {
+      contentType: req.headers["content-type"] as string | undefined,
+    });
+
+    return res.json(src);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Upload text-only page shortcut
 app.post(
@@ -589,6 +617,38 @@ app.post(
     }
   }
 );
+
+app.get('/media/:src/stream',
+  async (req, res) => {
+    const src = decodeURIComponent(req.params.src);
+  if (isS3Uri(src)) {
+    const url = await getSignedUrl(src, 3600);
+    return res.redirect(302, url);
+  } else {
+    const filePath = src;
+    const stat = await fs.promises.stat(filePath).catch(()=>null);
+    if (!stat) return res.status(404).end();
+    const range = req.headers.range;
+    const raw = path.extname(filePath);
+    const ext = raw.startsWith(".") ? raw.slice(1) : raw;
+    const contentType = extToMimeType(ext as AudioExt);
+    if (!range) {
+      res.setHeader('Content-Length', stat.size);
+      res.setHeader('Content-Type', contentType);
+      return fs.createReadStream(filePath).pipe(res);
+    }
+    const [from,to] = (range.split('=')[1]||'0-').split('-');
+    const start = Number(from||0);
+    const end = to ? Number(to) : stat.size-1;
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Length', String(end-start+1));
+    res.setHeader('Content-Type', contentType);
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+  }
+});
+
 
 function guessTemplateFromBlocks(blocks: ContentBlock[]): PageTemplate {
   const hasImages = blocks.some((b) => b.type === "image");

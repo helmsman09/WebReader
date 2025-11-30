@@ -1,9 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
 import { User, type IUser } from "../models/User";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../config/env";
 
 export interface AuthedRequest extends Request {
   user?: IUser;         // root user
   authDevice?: IUser;   // device user row
+  deviceId?: string;
+  watermarkId?: string;
 }
 
 export async function apiKeyAuth(
@@ -46,5 +50,39 @@ export async function apiKeyAuth(
   } catch (e) {
     console.error(e);
     res.status(500).send("Auth error");
+  }
+}
+
+export function authMiddleware(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const auth = req.headers.authorization;
+
+  if (!auth || !auth.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing or invalid Authorization" });
+  }
+
+  const token = auth.slice("Bearer ".length).trim();
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      sub: string;
+      email?: string;
+      [key: string]: any;
+    };
+
+    // Normalize into req.user: TO-DO
+    /*
+    req.user = {
+      id: decoded.sub,
+      email: decoded.email,
+    };*/
+
+    return next();
+  } catch (err) {
+    console.error("JWT verification failed", err);
+    return res.status(401).json({ error: "Invalid token" });
   }
 }

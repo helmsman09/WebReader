@@ -130,15 +130,19 @@ export const PageDetailScreen: React.FC<Props> = ({ nav, route }) => {
   };
 
   const handleTogglePlay = async () => {
-    if (!page?.tts?.audioUrl) {
+    console.log("TTS play uri src: ", page?.tts?.src);
+    if (!page?.tts?.src) {
       Alert.alert("No TTS audio", "Generate TTS first, then try again.");
       return;
     }
+    const src = page.tts.src;
     try {
       if (!sound) {
         setAudioState("loading");
+        const audioUrl = `${backendUrl}/media/${encodeURIComponent(src)}/stream`;
+        console.log("TTS play audio url: ", audioUrl);
         const { sound: newSound } = await Audio.Sound.createAsync({
-          uri: page.tts.audioUrl
+          uri: audioUrl
         });
         setSound(newSound);
         await newSound.playAsync();

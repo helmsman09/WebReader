@@ -11,21 +11,20 @@
   "scripts": {
     "sync-env": "node scripts/sync-env.js",
     "typecheck": "npm run typecheck --workspaces",
-
     "dev:backend": "npm run sync-env && npm run dev -w @news-capture/backend",
     "dev:dashboard": "npm run sync-env && npm run dev -w @news-capture/dashboard",
     "dev:mobile": "npm run sync-env && npm run start -w @news-capture/mobile",
     "dev:extension": "npm run sync-env && npm run dev -w @news-capture/extension",
     "dev": "npm run sync-env && npm run dev:backend && npm run dev:dashboard && npm run dev:mobile && npm run dev:extension",
-
     "build:types": "npm run build -w @news-capture/types",
     "build:backend": "npm run build -w @news-capture/backend",
     "build:dashboard": "npm run build -w @news-capture/dashboard",
     "build:extension": "npm run build -w @news-capture/extension",
     "build:mobile": "npm run build -w @news-capture/mobile",
-    "build": "npm run sync-env && npm run build:types && npm run build:backend && npm run build:dashboard && npm run build:extension && npm run build:mobile"
+    "build": "npm run sync-env && npm run build:types && npm run build:backend && npm run build:dashboard && npm run build:extension"
   },
   "dependencies": {
+    "jsonwebtoken": "^9.0.2",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

@@ -5,6 +5,7 @@ import { ttsQueue, PageJobData } from "../queues/queues";
 import { Page } from "../models/Page";
 import type { TtsVoiceProfile } from "@news-capture/types";
 import OpenAI from "openai";
+import {uploadTtsAudioToS3} from "../aws/s3"
 
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://localhost:27017/news_capture";
@@ -55,14 +56,16 @@ async function synthesizeTts(
 }
 
 // Replace this stub with real storage (S3, GCS, etc.)
-async function uploadAudioAndGetUrl(
+export async function uploadAudioAndGetUrl(
+  userId: string,
   pageId: string,
-  audioBuffer: Buffer
-): Promise<string> {
+  audioBuffer: Buffer,
+  opts?: Object
+): Promise < string > {
   console.log(
-    `[TTS] Generated audio for page ${pageId} (size=${audioBuffer.length} bytes)`
+    `[TTS] Generated audio for user ${userId} page ${pageId} (size=${audioBuffer.length} bytes)`
   );
-  return `https://example.com/audio/${pageId}-tts.mp3`;
+  return uploadTtsAudioToS3(userId, pageId, audioBuffer, opts);
 }
 
 async function main() {
@@ -72,7 +75,7 @@ async function main() {
   const worker = new Worker<PageJobData>(
     ttsQueue.name,
     async (job: Job<PageJobData>) => {
-      const { pageId } = job.data;
+      const { pageId, userId } = job.data;
       const page = await Page.findById(pageId).exec();
       if (!page) {
         console.warn(`[TTS] Page not found: ${pageId}`);
@@ -91,13 +94,14 @@ async function main() {
         page.mainText,
         profile
       );
-      const audioUrl = await uploadAudioAndGetUrl(
+      const src = await uploadAudioAndGetUrl(
+        userId,
         page._id.toString(),
         audioBuffer
       );
 
       page.set("tts", {
-        audioUrl,
+        src,
         voiceProfile: profile,
         provider,
         createdAt: new Date().toISOString()
@@ -107,7 +111,7 @@ async function main() {
       page.audioSources.push({
         index: nextIndex,
         tagName: "AUDIO_TTS",
-        src: audioUrl,
+        src: src,
         type: "audio/mpeg"
       } as any);
 
