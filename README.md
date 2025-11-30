@@ -41,20 +41,19 @@ Wire your MongoDB, Redis, and `OPENAI_API_KEY` in `backend/.env`, build the pack
 cd news-reading-monorepo
 ```
 
-# root workspace install
-# 1) Install deps across all workspaces (backend, dashboard, extension, mobile. types)
+### 1.1 Install deps across all workspaces (backend, dashboard, extension, mobile. types)
 ```bash
 npm install
 ```
-# 2) Build shared types
+### 1.2 Build shared types
 ```bash
 npm run build:types
 ```
-# 3) Typecheck everything
+### 1.3 Typecheck everything
 ```bash
 npm run typecheck
 ```
-# 4) Build everything (except mobile)
+### 1.4 Build everything (except mobile)
 ```bash
 npm run build
 ```
